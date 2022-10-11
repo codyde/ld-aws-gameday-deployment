@@ -1,0 +1,317 @@
+# Copyright 2022 Amazon.com and its affiliates; all rights reserved. 
+# This file is Amazon Web Services Content and may not be duplicated or distributed without permission.
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Reference Quest - Central Template
+
+
+Parameters:
+  # These parameters are supplied by the Quests API when this template is deployed 
+  gdQuestsAPIBase:
+    # Default: https://t85uaaidx0.execute-api.us-east-1.amazonaws.com/LATEST
+    Description: GameDay Quests API Base URL (https://hostname:port/api)
+    Type: String
+  gdQuestsAPITokenSecretName:
+    Default: 'QuestsApiToken'
+    Description: Secrets Manager secret with API Token to use for authentication
+    Type: String
+  gdQuestsSnsTopicArn:
+    # Default: arn:aws:sns:us-east-1:026257810738:gdQuestsApi-SnsQuestsApiTopic-6ELQWDWNOYAO
+    Description: ARN of the GameDay Quests API SNS topic
+    Type: String
+  DeployAssetsBucket:
+    # Default: ee-assets-prod-us-east-1
+    Description: The name of the S3 bucket where assets are stored
+    Type: String
+  DeployAssetsKeyPrefix:
+    # Default: modules/9c0e89820b864addaed45ec2f5440379/v5/2ae514a9-a6dc-4fc0-a797-3f4a7bbd1d63
+    Description: S3 key prefix where assets are stored
+    Type: String
+  StaticAssetsBucket:
+    Type: String
+    Description: (Optional) Bucket for static assets that live outside of the pipeline (e.g. data for seeding)
+    Default: ''
+  StaticAssetsKeyPrefix:
+    Type: String
+    Description: (Optional) Bucket prefix for static assets that live outside of the pipeline (e.g. data for seeding)
+    Default: ''
+
+  # Additional parameters required by this template - These parameters MUST contain default values that will be used when the Quests API deploys this quest.
+  QuestId:
+    Default: 2ae514a9-a6dc-4fc0-a797-3f4a7bbd1d63
+    Description: The ID assigned to this quest
+    Type: String
+  QuestLambdaSourceKey:
+    Default: gdQuests-lambda-source.zip
+    Description: S3 key for the Lamda source code used by the Testing Quest
+    Type: String
+
+  # Additional parameters specific to this quest
+  ChaosTimerMinutes:
+    Default: 10
+    Description: The minute that are to elapse for the chaos event to start
+    Type: Number
+
+
+Resources:
+
+# ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+# ║ DynamoDB Resources                                                                                                                                       ║
+# ╠═══════════════════════════════╤═════════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════╣
+# ║ QuestTeamStatusTable          │ AWS::DynamoDB::Table        │ Table tracking the status and metadata for teams                                           ║
+# ╚═══════════════════════════════╧═════════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════╝
+
+  QuestTeamStatusTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: team-id
+        AttributeType: S
+      KeySchema:
+      - AttributeName: team-id
+        KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+# ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+# ║ AWS GameDay Quests - SNS Integration Resources                                                                                                           ║
+# ╠═══════════════════════════════╤═════════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════╣
+# ║ SnsLambda                     │ AWS::Lambda::Function       │ Shows developers how to integrate with the Quests API SNS topic                            ║
+# ║ LambdaInvokePermissionSNS     │ AWS::Lambda::Permission     │ Grants the SNS Topic permission to invoke the Lambda function                              ║
+# ║ DashboardInputLambdaSubscri.. │ AWS::SNS::Subscription      │ Subscribes the Lambda function to the SNS topic                                            ║
+# ╚═══════════════════════════════╧═════════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════╝
+
+  SnsLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: sns_lambda.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Runtime: python3.9
+      Timeout: '30'
+      Code:
+        S3Bucket: !Ref DeployAssetsBucket
+        S3Key: !Join
+        - ''
+        - - !Ref DeployAssetsKeyPrefix
+          - !Ref QuestLambdaSourceKey
+      Environment:
+        Variables:
+          QUEST_API_TOKEN: !Join [ '', ['{{resolve:secretsmanager:', !Ref gdQuestsAPITokenSecretName, ':SecretString}}'] ]
+          QUEST_ID: !Ref QuestId
+          QUEST_API_BASE: !Ref gdQuestsAPIBase
+          GAMEDAY_REGION: !Ref AWS::Region
+          INIT_LAMBDA: !Ref InitLambda
+          UPDATE_LAMBDA: !Ref UpdateLambda
+          EVENT_RULE_CRON: !Ref EventRuleLambdaCron
+
+  LambdaInvokePermissionSNS: 
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      Principal: sns.amazonaws.com
+      SourceArn:  !Ref gdQuestsSnsTopicArn 
+      FunctionName: !Ref SnsLambda
+
+  DashboardInputLambdaSubscription:
+    Type: "AWS::SNS::Subscription"
+    DeletionPolicy: Retain
+    Properties:
+      Endpoint: !GetAtt SnsLambda.Arn
+      Protocol: lambda
+      TopicArn: !Ref gdQuestsSnsTopicArn
+      FilterPolicy:
+        quest-id:
+          - !Ref QuestId
+        event:
+          - "gdQuests:INPUT_UPDATED"
+          - "gdQuests:QUEST_DEPLOYING"
+          - "gdQuests:QUEST_IN_PROGRESS"
+
+  # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+  # ║ AWS GameDay Quests - Cron Integration Resources                                                                                                          ║
+  # ╠═══════════════════════════════╤═════════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════╣
+  # ║ CronLambda                    │ AWS::Lambda::Function       │ Periodically triggered lambda to re-evaluate team account status using EventBridge         ║
+  # ║ LambdaInvokePermissionCWE     │ AWS::Lambda::Permission     │ Grants the CloudWatch Event permission to invoke the Lambda function                       ║
+  # ║ EventsRuleLambdaCron          │ AWS::Events::Rule           │ Sets the Cron trigger in CloudWatch Events                                                 ║
+  # ╚═══════════════════════════════╧═════════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════╝
+
+  CronLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: cron_lambda.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Runtime: python3.9
+      Timeout: '30'
+      Code:
+        S3Bucket: !Ref DeployAssetsBucket
+        S3Key: !Join
+        - ''
+        - - !Ref DeployAssetsKeyPrefix
+          - !Ref QuestLambdaSourceKey
+      Environment:
+        Variables:
+          QUEST_API_TOKEN: !Join [ '', ['{{resolve:secretsmanager:', !Ref gdQuestsAPITokenSecretName, ':SecretString}}'] ]
+          QUEST_ID: !Ref QuestId
+          QUEST_API_BASE: !Ref gdQuestsAPIBase
+          GAMEDAY_REGION: !Ref AWS::Region
+          CHECK_TEAM_LAMBDA: !Ref CheckTeamLambda
+
+  LambdaInvokePermissionCWE: 
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:  !GetAtt EventRuleLambdaCron.Arn 
+      FunctionName: !Ref CronLambda
+
+  EventRuleLambdaCron:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: EventRuleLambdaCron
+      ScheduleExpression: rate(1 minute)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt CronLambda.Arn
+          Id: !Ref CronLambda
+
+# ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+# ║ AWS GameDay Quests - Core Lambda functions                                                                                                               ║
+# ╠═══════════════════════════════╤═════════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════╣
+# ║ InitLambda                    │ AWS::Lambda::Function       │ Triggered by SnsLambda. Initializes quest output and inputs                                ║
+# ║ UpdateLambda                  │ AWS::Lambda::Function       │ Triggered by SnsLambda. Handles logic for dashboard input updates from teams               ║
+# ║ CheckTeamLambda               │ AWS::Lambda::Function       │ Triggered by CronLambda. Runs main team account central_lambda_source logic                ║
+# ╚═══════════════════════════════╧═════════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════╝
+  InitLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: init_lambda.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Runtime: python3.9
+      Timeout: '30'
+      Code:
+        S3Bucket: !Ref DeployAssetsBucket
+        S3Key: !Join
+        - ''
+        - - !Ref DeployAssetsKeyPrefix
+          - !Ref QuestLambdaSourceKey
+      Environment:
+        Variables:
+          QUEST_API_TOKEN: !Join [ '', ['{{resolve:secretsmanager:', !Ref gdQuestsAPITokenSecretName, ':SecretString}}'] ]
+          QUEST_ID: !Ref QuestId
+          QUEST_API_BASE: !Ref gdQuestsAPIBase
+          GAMEDAY_REGION: !Ref AWS::Region
+          QUEST_TEAM_STATUS_TABLE: !Ref QuestTeamStatusTable
+          ASSETS_BUCKET: !Ref StaticAssetsBucket
+          ASSETS_BUCKET_PREFIX: !Ref StaticAssetsKeyPrefix
+
+  UpdateLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: update_lambda.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Runtime: python3.9
+      Timeout: '30'
+      Code:
+        S3Bucket: !Ref DeployAssetsBucket
+        S3Key: !Join
+        - ''
+        - - !Ref DeployAssetsKeyPrefix
+          - !Ref QuestLambdaSourceKey
+      Environment:
+        Variables:
+          QUEST_API_TOKEN: !Join [ '', ['{{resolve:secretsmanager:', !Ref gdQuestsAPITokenSecretName, ':SecretString}}'] ]
+          QUEST_ID: !Ref QuestId
+          QUEST_API_BASE: !Ref gdQuestsAPIBase
+          GAMEDAY_REGION: !Ref AWS::Region
+          QUEST_TEAM_STATUS_TABLE: !Ref QuestTeamStatusTable
+
+  CheckTeamLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: check_team_lambda.lambda_handler
+      Role: !GetAtt LambdaRole.Arn
+      Runtime: python3.9
+      Timeout: '60'
+      Code:
+        S3Bucket: !Ref DeployAssetsBucket
+        S3Key: !Join
+        - ''
+        - - !Ref DeployAssetsKeyPrefix
+          - !Ref QuestLambdaSourceKey
+      Environment:
+        Variables:
+          QUEST_API_TOKEN: !Join [ '', ['{{resolve:secretsmanager:', !Ref gdQuestsAPITokenSecretName, ':SecretString}}'] ]
+          QUEST_ID: !Ref QuestId
+          QUEST_API_BASE: !Ref gdQuestsAPIBase
+          GAMEDAY_REGION: !Ref AWS::Region
+          QUEST_TEAM_STATUS_TABLE: !Ref QuestTeamStatusTable
+          CHAOS_TIMER_MINUTES: !Ref ChaosTimerMinutes
+          ASSETS_BUCKET: !Ref StaticAssetsBucket
+          ASSETS_BUCKET_PREFIX: !Ref StaticAssetsKeyPrefix
+
+# ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+# ║ AWS GameDay Quests - Other Resources                                                                                                                     ║
+# ╠═══════════════════════════════╤═════════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════╣
+# ║ LambdaRole                    │ AWS::IAM::Role              │ Grants Permissions to all Lambda functions used in this Quest                              ║
+# ╚═══════════════════════════════╧═════════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════╝
+  LambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Description: Provides permissions for internally-invoked Lambda resources
+      Policies:
+      - PolicyName: CloudWatchLogsPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            - logs:DescribeLogStreams
+            Resource: "*"
+      - PolicyName: DynamoDBPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - dynamodb:DeleteItem
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:UpdateItem
+            Resource: !GetAtt QuestTeamStatusTable.Arn
+      - PolicyName: S3Policy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            Resource: !Join [ '', ['arn:aws:s3:::', !Ref StaticAssetsBucket, '/*'] ]
+      - PolicyName: LambdaPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - 'lambda:Invoke*'
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - 'sts:AssumeRole'
+            Resource: '*'
+
+Outputs:
+  TableName:
+    Value: !Ref 'QuestTeamStatusTable'
+    Description: Table name of the newly created DynamoDB table

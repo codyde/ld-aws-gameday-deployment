@@ -1,0 +1,1 @@
+No particular considerations are required for this quest

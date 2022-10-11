@@ -1,0 +1,3787 @@
+# Copyright 2022 Amazon.com and its affiliates; all rights reserved. This file is Amazon Web Services Content and may not be duplicated or distributed without permission.
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "AWS GameDay Quests - Stack for deployment into a Developer account."
+
+Parameters:
+  # Parameters required to deploy the AWS GameDay Quests Development Kit
+  gdQuestsEEAssetsBucketPrefix:
+    Default: "ee-assets-prod-"
+    Description: The S3 Bucket name prefix containing deployment artifacts for the AWS GameDay Quests Development Kit - Please do not modify.
+    Type: String
+  gdQuestsEEAssetsKeyPrefix:
+    #Default: "modules/9c0e89820b864addaed45ec2f5440379/v5/"
+    Default: "modules/9c0e89820b864addaed45ec2f5440379/v3/"   # NoStep Module
+    Description: The S3 key prefix used to locate deployment artifacts for the AWS GameDay Quests Development Kit - Please do not modify.
+    Type: String
+  gdQuestsLambdaSourceKey:
+    Default: "gameday-quests-api-lambda-source.zip"
+    Description: The S3 Key for the Lamda source code used by the AWS GameDay Quests API - Please do not modify.
+    Type: String
+  EventUIIconsKey:
+    Default: "gameday-quests-eventui-icons.zip"
+    Description: S3 Key for the Event UI icons set used by the AWS GameDay Quests EventUI
+    Type: String
+  EventUILambdaSourceKey:
+    Default: "gameday-quests-eventui-lambda-source.zip"
+    Description: S3 Key for the Lamda source code used by the AWS GameDay Quests EventUI - Please do not modify.
+    Type: String
+  EventUIWebsiteSourceKey:
+    Default: "gameday-quests-eventui-website-source.zip"
+    Description: S3 Key for the website source code used by the AWS GameDay Quests EventUI - Please do not modify.
+    Type: String
+
+  # Parameters that are to be supplied by a Quest Developer
+  # IFF devDeploymentArtifactSource=Developpment: only LambdaLoadQuestsData, LambdaGraphQLHandler use this
+  devAssetsBucket:
+    Description: The name of the S3 Bucket that contains all development artifacts. Objects in this bucket must be able to be read by CloudFormation whilst deploying this template.
+    Type: String
+
+  # IFF devDeploymentArtifactSource=Developpment:  LambdaLoadQuestsData, LambdaGraphQLHandler use this
+  devAssetsKeyPrefix:
+    # Default: "modules/9c0e89820b864addaed45ec2f5440379/v3/"
+    Description: The S3 key prefix used to locate all development artifacts within the devAssetsBucket.
+    Type: String
+
+  devDeploymentArtifactSource:
+    AllowedValues:
+    - Development
+    - EventEngine
+    Default: EventEngine
+    Description: The source location of Deployment Artifacts. Must be either 'Development' or 'EventEngine'. Defaults to 'EventEngine'.
+    Type: String
+
+  devQuestsData:  
+    Default: dev-quests-data.json
+    Description: The name of the quests-data.json file that contains all quest information that will be loaded in to this event.
+    Type: String 
+
+  TracingEnabled:
+    AllowedValues:
+      - true
+      - false
+    Default: false
+    Description: Enable active tracing of Quests API services
+    Type: String
+
+Conditions:
+  DeployFromEE: !Equals [ !Ref devDeploymentArtifactSource, EventEngine ]
+  EnableTracing: !Equals [ !Ref TracingEnabled, true ]
+Mappings:
+  SubnetConfig:
+    VPC:
+      CIDR: '10.0.0.0/16'
+    PublicOne:
+      CIDR: '10.0.0.0/24'
+    PublicTwo:
+      CIDR: '10.0.1.0/24'
+    PrivateOne:
+      CIDR: '10.0.2.0/24'
+    PrivateTwo:
+      CIDR: '10.0.3.0/24'
+Resources:
+  # KMS S3 encryption key
+  s3Key:
+    Type: AWS::KMS::Key
+    Properties:
+      KeyPolicy:
+        Version: 2012-10-17
+        Id: key-s3
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Join ['', ['arn:aws:iam::', !Ref 'AWS::AccountId', ':root'] ]
+            Action: 'kms:*'
+            Resource: '*'
+
+  # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+  # ║ AppSync Resources                                                                                                                                        ║
+  # ╠════════════════════════════════════════════╤═════════════════════════════╤═══════════════════════════════════════════════════════════════════════════════╣
+  # ║ AppSyncAPI                                 │ AWS::AppSync::GraphQLApi    │ The GraphQL API that the EventUI uses                                         ║
+  # ║ AppSyncAPISchema                           │ AWS::AppSync::GraphQLSchema │ The GraphQL schema that is defined in the GraphQL API                         ║
+  # ║ AppSyncDataSourceLambdaGraphQLHandler      │ AWS::AppSync::DataSource    │ Datasource definition for all GraphQL queries and mutations                   ║
+  # ║ AppSyncDataSourceNone                      │ AWS::AppSync::DataSource    │ Datasource definition for GraphQL subscriptions and related mutations         ║
+  # ║ AppSyncResolverAllScoreEvents              │ AWS::AppSync::Resolver      │ Query resolver that retrieves score events                                    ║
+  # ║ AppSyncResolverDeleteInteraction           │ AWS::AppSync::Resolver      │ Mutation resolver used with subscriptions when deleting interaction           ║
+  # ║ AppSyncResolverGetQuestDetailsForTeam      │ AWS::AppSync::Resolver      │ Query resolver that populates the quest details page                          ║
+  # ║ AppSyncResolverGetQuestInteractionsForTeam │ AWS::AppSync::Resolver      │ Query resolver that populates interactions on the quest details page          ║
+  # ║ AppSyncResolverGetQuestsForTeam            │ AWS::AppSync::Resolver      │ Query resolver that lists available quests, populating the side navigation    ║
+  # ║ AppSyncResolverInteractionDeleted          │ AWS::AppSync::Resolver      │ Subscription resolver that receives deleted interactions                      ║
+  # ║ AppSyncResolverInteractionUpdated          │ AWS::AppSync::Resolver      │ Subscription resolver that receives created/updated interactions              ║
+  # ║ AppSyncResolverScoreRankings               │ AWS::AppSync::Resolver      │ Query resolver that gets score rankings                                       ║
+  # ║ AppSyncResolverStartQuestForTeam           │ AWS::AppSync::Resolver      │ Mutation resolver that starts a quest for a team                              ║
+  # ║ AppSyncResolverUpdateInputForTeam          │ AWS::AppSync::Resolver      │ Mutation resolver that updates the value of an input for a team               ║
+  # ║ AppSyncResolverUpdateInteraction           │ AWS::AppSync::Resolver      │ Mutation resolver used with subscriptions when creating/updating interactions ║
+  # ╚════════════════════════════════════════════╧═════════════════════════════╧═══════════════════════════════════════════════════════════════════════════════╝
+  AppSyncAPI:
+    Type: AWS::AppSync::GraphQLApi
+    Properties: 
+      AdditionalAuthenticationProviders:  
+      - AuthenticationType: API_KEY
+      - AuthenticationType: AWS_IAM
+      AuthenticationType: AMAZON_COGNITO_USER_POOLS
+      Name: gdQuests-EventUI-API
+      UserPoolConfig:
+        AwsRegion: !Ref AWS::Region
+        DefaultAction: ALLOW
+        UserPoolId: !Ref CognitoUserPool
+
+  AppSyncAPISchema:
+    Type: AWS::AppSync::GraphQLSchema
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      Definition: |-
+        enum eventStates {
+          DEVELOPMENT
+          ERRORED
+          IN_PROGRESS
+          INITIALIZING
+          READY
+          STOPPED
+          TERMINATED
+          UNKNOWN
+        }
+
+        enum questDetailStates {
+          AVAILABLE
+          COMPLETED
+          DEPLOYING
+          DISABLED
+          ERRORED
+          IN_PROGRESS
+          LOCKED
+        }
+
+        schema {
+          mutation: Mutation
+          query: Query
+          subscription: Subscription
+        }
+
+        type Mutation {
+          requestSupportForTeam: SupportRequest
+            @aws_cognito_user_pools
+          revealQuestHintForTeam(key: String! questId: ID!): QuestInteraction
+            @aws_cognito_user_pools
+          startQuestForTeam(questId: ID!): Quest
+            @aws_cognito_user_pools
+          updateInputForTeam(key: String!, questId: ID!, value: String!): QuestInteraction
+            @aws_cognito_user_pools
+          deleteInteraction(request: DeleteInteractionRequest): QuestInteraction
+            @aws_iam
+          updateInteraction(request: UpdateInteractionRequest): QuestInteraction
+            @aws_iam
+        }
+
+        type Query {
+          allScoreEvents(nextToken: String, filterCreatedAtStart: String, filterCreatedAtEnd: String): ScoreEventConnection
+            @aws_cognito_user_pools
+          eventData: EventData
+            @aws_cognito_user_pools
+          homeData: HomeData
+            @aws_cognito_user_pools
+          notificationsForTeam: [Notification]
+            @aws_cognito_user_pools
+          questDetailsForTeam(questId: ID): QuestDetail
+            @aws_cognito_user_pools
+          questInteractionsForTeam(questId: ID): [QuestInteraction]
+            @aws_cognito_user_pools
+          questsForTeam: [Quest]
+            @aws_cognito_user_pools
+          scoreRankings: [ScoreRanking]
+            @aws_cognito_user_pools
+        }
+
+        type Subscription {
+          interactionDeleted(teamId: String!, questId: ID!): QuestInteraction
+            @aws_subscribe(mutations: ["deleteInteraction"])
+          interactionUpdated(teamId: String!, questId: ID!): QuestInteraction
+            @aws_subscribe(mutations: ["updateInteraction"])
+        }
+
+        type EventData @aws_cognito_user_pools {
+          supportEnabled: Boolean
+          chimeEnabled: Boolean
+          chimeId: String
+          streamEnabled: Boolean
+          streamBaseUrl: String
+          twitchEnabled: Boolean
+          twitchChannel: String
+          surveyVisible: Boolean
+          surveyUrl: String
+          eventStatus: eventStates
+          scoreboard: String
+          teamHash: String
+          partner1LogoUrl: String
+          partner2LogoUrl: String
+          customBannerUrl: String
+        }
+
+        type HomeData @aws_cognito_user_pools {
+          name: String
+          description: String
+          blueprint: String
+          intro: String
+          startTime: Int
+          endTime: Int
+          region: String
+        }
+
+        type Notification @aws_cognito_user_pools {
+          notificationId: ID
+          displayTime: String
+          expiryTime: String
+          value: String
+        }
+
+        type Quest @aws_cognito_user_pools {
+          questId: ID!
+          name: String
+        }
+
+        type QuestDependencies @aws_cognito_user_pools {
+          questId: ID!
+          name: String
+        }
+
+        type QuestDetail @aws_cognito_user_pools {
+          questId: ID!
+          teamId: ID!
+          basePoints: Int
+          completionTime: Int
+          dependencies: [QuestDependencies]
+          description: String
+          difficulty: Int
+          duration: Int
+          name: String
+          ranking: Int
+          score: Float
+          services: [String]
+          startTime: Int
+          state: questDetailStates
+          teamsStarted: Int
+          useCase: [String]
+        }
+
+        type QuestInteraction @aws_cognito_user_pools @aws_iam {
+          questId: ID
+          teamId: String
+          type: String
+          cost: Int
+          dashboardIndex: Int
+          description: String
+          key: String
+          label: String
+          markdown: Boolean
+          value: String
+        }
+
+        type ScoreEvent {
+          createdAt: AWSDateTime!
+          description: String!
+          id: ID!
+          points: Float!
+          source: ScoreEventSource!
+        }
+
+        type ScoreEventConnection {
+          items: [ScoreEvent]
+          nextToken: String
+        }
+
+        type ScoreEventSource {
+          id: ID!
+          name: String!
+          type: ScoreEventSourceType!
+        }
+
+        enum ScoreEventSourceType {
+          ADHOC
+          QUEST
+        }
+
+        type ScoreRanking {
+          teamId: String
+          teamName: String
+          score: Float
+          rank: Int
+        }
+
+        type SurveyUrl @aws_cognito_user_pools {
+          url: String
+        }
+
+        type SupportRequest @aws_cognito_user_pools {
+          requestId: ID
+        }
+
+        input DeleteInteractionRequest @aws_iam {
+          teamId: String
+          questId: ID
+          type: String
+          key: String
+        }
+
+        input UpdateInteractionRequest @aws_iam {
+          teamId: String
+          questId: ID
+          type: String
+          cost: Int
+          dashboardIndex: Int
+          description: String
+          key: String
+          label: String
+          markdown: Boolean
+          value: String
+        }
+
+  AppSyncDataSourceLambdaGraphQLHandler:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      LambdaConfig:
+        LambdaFunctionArn: !GetAtt LambdaGraphQLHandler.Arn
+      Name: LambdaGraphQLHandler
+      ServiceRoleArn: !GetAtt IAMRoleAppSyncAPI.Arn
+      Type: AWS_LAMBDA
+
+  AppSyncDataSourceNone:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      Name: None
+      Type: NONE
+
+  AppSyncResolverAllScoreEvents:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceLambdaGraphQLHandler.Name
+      FieldName: allScoreEvents
+      TypeName: Query
+
+  AppSyncResolverDeleteInteraction:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceNone.Name
+      FieldName: deleteInteraction
+      RequestMappingTemplate: |-
+        {
+          "version": "2017-02-28",
+          "payload": $util.toJson($context.args.request)
+        }
+      ResponseMappingTemplate: |-
+        $util.toJson($context.result)
+      TypeName: Mutation
+    DependsOn: AppSyncAPISchema
+
+  AppSyncResolverGetEventData:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceLambdaGraphQLHandler.Name
+      FieldName: eventData
+      TypeName: Query
+
+  AppSyncResolverGetHomeData:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceLambdaGraphQLHandler.Name
+      FieldName: homeData
+      TypeName: Query
+
+  AppSyncResolverGetNotificationsForTeam:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceLambdaGraphQLHandler.Name
+      FieldName: notificationsForTeam
+      TypeName: Query
+
+  AppSyncResolverGetQuestDetailsForTeam:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceLambdaGraphQLHandler.Name
+      FieldName: questDetailsForTeam
+      TypeName: Query
+
+  AppSyncResolverGetQuestInteractionsForTeam:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceLambdaGraphQLHandler.Name
+      FieldName: questInteractionsForTeam
+      TypeName: Query
+
+  AppSyncResolverGetQuestsForTeam:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceLambdaGraphQLHandler.Name
+      FieldName: questsForTeam
+      TypeName: Query
+
+  AppSyncResolverInteractionDeleted:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceNone.Name
+      FieldName: interactionDeleted
+      TypeName: Subscription
+      RequestMappingTemplate: |-
+        {
+          "version": "2017-02-28",
+          "payload": $util.toJson($context.args)
+        }
+      ResponseMappingTemplate: |-
+        #if(! ${context.result})
+          $utils.unauthorized()
+        #elseif($ctx.identity.claims.get("custom:team_id") != ${context.arguments.teamId})
+          $utils.unauthorized()
+        #else
+          ##User is authorized, return null to continue
+          null
+        #end
+
+  AppSyncResolverInteractionUpdated:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceNone.Name
+      FieldName: interactionUpdated
+      TypeName: Subscription
+      RequestMappingTemplate: |-
+        {
+          "version": "2017-02-28",
+          "payload": $util.toJson($context.args)
+        }
+      ResponseMappingTemplate: |-
+        #if(! ${context.result})
+          $utils.unauthorized()
+        #elseif($ctx.identity.claims.get("custom:team_id") != ${context.arguments.teamId})
+          $utils.unauthorized()
+        #else
+          ##User is authorized, return null to continue
+          null
+        #end
+
+  AppSyncResolverRequestSupportForTeam:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceLambdaGraphQLHandler.Name
+      FieldName: requestSupportForTeam
+      TypeName: Mutation
+    DependsOn: AppSyncAPISchema
+
+  AppSyncResolverRevealQuestHintForTeam:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceLambdaGraphQLHandler.Name
+      FieldName: revealQuestHintForTeam
+      TypeName: Mutation
+    DependsOn: AppSyncAPISchema
+
+  AppSyncResolverScoreRankings:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceLambdaGraphQLHandler.Name
+      FieldName: scoreRankings
+      TypeName: Query
+
+  AppSyncResolverStartQuestForTeam:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceLambdaGraphQLHandler.Name
+      FieldName: startQuestForTeam
+      TypeName: Mutation
+    DependsOn: AppSyncAPISchema
+
+  AppSyncResolverUpdateInputForTeam:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceLambdaGraphQLHandler.Name
+      FieldName: updateInputForTeam
+      TypeName: Mutation
+    DependsOn: AppSyncAPISchema
+
+  AppSyncResolverUpdateInteraction:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt AppSyncAPI.ApiId
+      DataSourceName: !GetAtt AppSyncDataSourceNone.Name
+      FieldName: updateInteraction
+      RequestMappingTemplate: |-
+        {
+          "version": "2017-02-28",
+          "payload": $util.toJson($context.args.request)
+        }
+      ResponseMappingTemplate: |-
+        $util.toJson($context.result)
+      TypeName: Mutation
+    DependsOn: AppSyncAPISchema
+
+  # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+  # ║ CloudFront Resources                                                                                                                                     ║
+  # ╠════════════════════════════════╤═════════════════════════════════════════════════╤═══════════════════════════════════════════════════════════════════════╣
+  # ║ CloudFrontDistribution         │ AWS::CloudFront::Distribution                   │ CloudFront Distribution that hosts the Event UI                       ║
+  # ║ CloudFrontOriginAccessIdentity │ AWS::CloudFront::CloudFrontOriginAccessIdentity │ Origin Access Identity that grants the CloudFront distribution with   ║
+  # ║                                │                                                 │   access to the Event UI hosted in S3                                 ║
+  # ╚════════════════════════════════╧═════════════════════════════════════════════════╧═══════════════════════════════════════════════════════════════════════╝
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        DefaultCacheBehavior:
+          AllowedMethods:
+          - HEAD
+          - GET
+          - OPTIONS
+          CachedMethods:
+          - HEAD
+          - GET
+          ForwardedValues:
+            QueryString: false
+          # LambdaFunctionAssociations:
+          # - EventType: origin-request
+          #   LambdaFunctionARN: !GetAtt LambdaEdgeFn.FunctionArnWithVersion
+          TargetOriginId: gdQuestsEventUIS3Bucket
+          ViewerProtocolPolicy: redirect-to-https
+        DefaultRootObject: index.html
+        Enabled: true
+        Origins:
+        - DomainName: !GetAtt gdQuestsEventUIS3Bucket.RegionalDomainName
+          Id: gdQuestsEventUIS3Bucket
+          S3OriginConfig:
+            OriginAccessIdentity: !Join
+            - ''
+            - - 'origin-access-identity/cloudfront/'
+              - !Ref CloudFrontOriginAccessIdentity
+
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: AWS GameDay Quests Event UI Origin Access Identity
+
+  # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+  # ║ CloudWatch Resources                                                                                                                                     ║
+  # ╠═══════════════════════════════╤═════════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════╣
+  # ║ DashboardAPI                  │ AWS::CloudWatch::Dashboard  │ Monitoring Dashboard for the Quests API                                                    ║
+  # ╚═══════════════════════════════╧═════════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════╝
+  DashboardAPI:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: QuestsAPI
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "text",
+              "x": 0,
+              "y": 0,
+              "width": 24,
+              "height": 2,
+              "properties": {
+                "markdown": "\n# Quests API Gateway\n"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 2,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/ApiGateway", "Latency", "ApiName", "gdQuests-api" ],
+                  [ ".", "IntegrationLatency", ".", "." ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "title": "API Gateway Latency",
+                "annotations": {
+                  "horizontal": [
+                    {
+                      "label": "Target",
+                      "value": 500
+                    }
+                  ]
+                },
+                "stat": "Average",
+                "period": 60,
+                "yAxis": {
+                  "left": {
+                    "showUnits": true,
+                    "min": 0
+                  }
+                }
+              }
+            },
+            {
+              "type": "text",
+              "x": 0,
+              "y": 8,
+              "width": 24,
+              "height": 2,
+              "properties": {
+                "markdown": "\n# DynamoDB Tables\n"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 10,
+              "width": 8,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "${DynamoDbOutputsTable}", { "color": "#2ca02c" } ],
+                  [ ".", "ConsumedWriteCapacityUnits", ".", ".", { "color": "#d62728" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "stat": "Average",
+                "period": 60,
+                "title": "${DynamoDbOutputsTable} RCU/WCU"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 8,
+              "y": 10,
+              "width": 8,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "${DynamoDbQuestsTable}", { "color": "#2ca02c" } ],
+                  [ ".", "ConsumedWriteCapacityUnits", ".", ".", { "color": "#d62728" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "stat": "Average",
+                "period": 60,
+                "title": "${DynamoDbQuestsTable} RCU/WCU"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 16,
+              "y": 10,
+              "width": 8,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "${DynamoDbQuestStatesTable}", { "color": "#2ca02c" } ],
+                  [ ".", "ConsumedWriteCapacityUnits", ".", ".", { "color": "#d62728" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "stat": "Average",
+                "period": 60,
+                "title": "${DynamoDbQuestStatesTable} RCU/WCU"
+              }
+            },
+            {
+              "type": "text",
+              "x": 0,
+              "y": 24,
+              "width": 24,
+              "height": 2,
+              "properties": {
+                "markdown": "\n# Inputs\nAll Lambda Functions Timeout: 30s"
+              }
+            },
+            {
+              "type": "text",
+              "x": 0,
+              "y": 66,
+              "width": 24,
+              "height": 2,
+              "properties": {
+                "markdown": "\n# States\nAll Lambda Functions Timeout: 30s"
+              }
+            }
+          ]
+        }
+
+  # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+  # ║ CloudWatch Events Resources                                                                                                                              ║
+  # ╠═══════════════════════════════╤═════════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════╣
+  # ║ EventsRuleLambdaCron          │ AWS::Events::Rule           │ Event that invokes the gdQuestsApi-Cron Lambda function on a schedule                      ║
+  # ╚═══════════════════════════════╧═════════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════╝
+  EventsRuleLambdaCron:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Event that invokes the gdQuestsApi-Cron Lambda function on a schedule
+      ScheduleExpression: rate(10 minutes)
+      State: ENABLED
+      Targets: 
+      - Arn: !GetAtt LambdaCron.Arn
+        Id: gdQuestsApi-Cron
+
+  # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+  # ║ Cognito Resources                                                                                                                                        ║
+  # ╠════════════════════════════════════╤══════════════════════════════╤══════════════════════════════════════════════════════════════════════════════════════╣
+  # ║ CognitoUserPool                    │ AWS::Cognito::UserPool       │ Cognito user pool that stores credentials for all EventUI users                      ║
+  # ║ CognitoUserPoolClient              │ AWS::Cognito::UserPoolClient │ The user pool client used by the Event UI to authenticate against the user pool      ║
+  # ║ CognitoUserPoolDomain              │ AWS::Cognito::UserPoolDomain │ The event-specific user pool domain used for the user pool                           ║
+  # ║ gdQuestsEventUICognitoIdentityPool │ AWS::Cognito::IdentityPool   │ The identity pool associated with the user pool                                      ║
+  # ╚════════════════════════════════════╧══════════════════════════════╧══════════════════════════════════════════════════════════════════════════════════════╝
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+        - Name: admin_only
+          Priority: 1
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+      Schema:
+      - AttributeDataType: String
+        Mutable: true
+        Name: team_id
+        Required: false
+      UsernameAttributes:
+      - email
+      UsernameConfiguration:
+        CaseSensitive: false
+      UserPoolName: !Sub ${AWS::StackName}-UserPool
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      AllowedOAuthFlows:
+      - code
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes:
+      - email
+      - openid
+      - profile
+      CallbackURLs:
+      - !Join [ '', [ 'https://', !GetAtt CloudFrontDistribution.DomainName, '/' ] ]
+      ClientName: gdQuests-EventUI
+      ExplicitAuthFlows:
+      - ALLOW_USER_SRP_AUTH
+      - ALLOW_REFRESH_TOKEN_AUTH
+      GenerateSecret: false
+      LogoutURLs:
+      - !Join [ '', [ 'https://', !GetAtt CloudFrontDistribution.DomainName, '/?signout=true' ] ]
+      PreventUserExistenceErrors: ENABLED
+      ReadAttributes:
+      - email
+      - custom:team_id
+      SupportedIdentityProviders:
+      - COGNITO
+      UserPoolId: !Ref CognitoUserPool
+
+  CognitoUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Join ['', [!Ref AWS::AccountId, '-unicornrentals-dev'] ]
+      UserPoolId: !Ref CognitoUserPool
+
+  gdQuestsEventUICognitoIdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      AllowUnauthenticatedIdentities: true
+      CognitoIdentityProviders:
+      - ClientId: !Ref CognitoUserPoolClient
+        ProviderName: !GetAtt CognitoUserPool.ProviderName
+
+  # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+  # ║ DynamoDB Resources                                                                                                                                       ║
+  # ╠══════════════════════════════════╤══════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════╣
+  # ║ DynamoDbMockEventsTable          │ AWS::DynamoDB::Table     │ Mock Events Table deployed when outside of the context of the AWS Event Engine. Allows     ║
+  # ║                                  │                          │   Quest developers to simulate Event Engine event state.                                   ║
+  # ║ DynamoDbHintsTable               │ AWS::DynamoDB::Table     │ The Hints table. Defines what hints are globally defined.                                  ║
+  # ║ DynamoDbInputsTable              │ AWS::DynamoDB::Table     │ The Inputs Table. Stores all input fields that teams interact with while working on quests ║
+  # ║ DynamoDbLockedResourcesTable     │ AWS::DynamoDB::Table     │ The Resource Locks table. Tracks the IAM resources and actions that a TeamRole should be   ║
+  # ║                                  │                          │   denied from using after quests have been enabled/activated.                              ║
+  # ║ DynamoDbMockTeamsTable           │ AWS::DynamoDB::Table     │ Mock Teams Table deployed when outside of the context of the AWS Event Engine. Allows      ║
+  # ║                                  │                          │   Quest developers to simulate teams whilst testing.                                       ║
+  # ║ DynamoDbOutputsTable             │ AWS::DynamoDB::Table     │ The Outputs Table. Stores all output fields displayed to teams while working on quests     ║
+  # ║ DynamoDbQuestsTable              │ AWS::DynamoDB::Table     │ The Quests table. Defines what quests are globally defined.                                ║
+  # ║ DynamoDbQuestStatesTable         │ AWS::DynamoDB::Table     │ The Quest States table. Defines the status of quests available to each team in this        ║
+  # ║                                  │                          │   GameDay event.                                                                           ║
+  # ║ DynamoDbScoreEventsTable         │ AWS::DynamoDB::Table     │ The Score Events table. Stores score events.                                               ║
+  # ║ DynamoDbScoresTable              │ AWS::DynamoDB::Table     │ The Scoress table. Stores score events.                                                    ║
+  # ╚══════════════════════════════════╧══════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════╝
+  DynamoDbMockEventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: event-id
+        AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+      - AttributeName: event-id
+        KeyType: HASH
+      TableName: gdQuestsApi-MockEvents
+
+  DynamoDbHintsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: team-id
+        AttributeType: S
+      - AttributeName: quest-hint
+        AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+      - AttributeName: team-id
+        KeyType: HASH
+      - AttributeName: quest-hint
+        KeyType: RANGE
+      TableName: gdQuestsApi-Hints
+
+ # DynamoDbHintStatesTable:
+ # DynamoDbImagesTable:
+
+  DynamoDbInputsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: team-id
+        AttributeType: S
+      - AttributeName: quest-id-key
+        AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+      - AttributeName: team-id
+        KeyType: HASH
+      - AttributeName: quest-id-key
+        KeyType: RANGE
+      TableName: gdQuestsApi-Inputs
+
+  DynamoDbOutputsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: team-id
+        AttributeType: S
+      - AttributeName: quest-id-key
+        AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+      - AttributeName: team-id
+        KeyType: HASH
+      - AttributeName: quest-id-key
+        KeyType: RANGE
+      TableName: gdQuestsApi-Outputs
+
+  DynamoDbLockedResourcesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: team-id
+        AttributeType: S
+      - AttributeName: sid
+        AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+      - AttributeName: team-id
+        KeyType: HASH
+      - AttributeName: sid
+        KeyType: RANGE
+      TableName: gdQuestsApi-ResourceLocks
+
+  DynamoDbMockTeamsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: team-id
+        AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+      - AttributeName: team-id
+        KeyType: HASH
+      TableName: gdQuestsApi-MockTeams
+
+  DynamoDbQuestsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: quest-id
+        AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+      - AttributeName: quest-id
+        KeyType: HASH
+      TableName: gdQuestsApi-Quests
+
+  DynamoDbQuestStatesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: quest-id
+        AttributeType: S
+      - AttributeName: team-id
+        AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+      - AttributeName: team-id
+        KeyType: HASH
+      - AttributeName: quest-id
+        KeyType: RANGE
+      TableName: gdQuestsApi-QuestStates
+
+  DynamoDbScoreEventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: score-event-id
+        AttributeType: S
+      - AttributeName: team-id
+        AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+      - AttributeName: team-id
+        KeyType: HASH
+      - AttributeName: score-event-id
+        KeyType: RANGE
+      TableName: gdQuestsApi-ScoreEvents
+
+  DynamoDbScoresTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: sk
+        AttributeType: S
+      - AttributeName: team-id
+        AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      GlobalSecondaryIndexes:
+      - IndexName: sk-team-id-index
+        KeySchema:
+        - AttributeName: sk
+          KeyType: HASH
+        - AttributeName: team-id
+          KeyType: RANGE
+        Projection:
+          ProjectionType: ALL
+      KeySchema:
+      - AttributeName: team-id
+        KeyType: HASH
+      - AttributeName: sk
+        KeyType: RANGE
+      TableName: gdQuestsApi-Scores
+
+  # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+  # ║ IAM Resources                                                                                                                                            ║
+  # ╠══════════════════════════════════╤══════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════╣
+  # ║ IAMRoleAppSyncAPI                | AWS::IAM::Role           │ Provides AppSync with the ability to call the GraphQLHandler Lambda function               ║
+  # ║ IamRoleCloudFormation            | AWS::IAM::Role           │ Provides permissions for CloudFormation resources to deploy quests                         ║
+  # ║ IamRoleLambda                    │ AWS::IAM::Role           │ Provides permissions for internally-invoked Lambda resources                               ║
+  # ║ IAMRoleLambdaGraphQLHandler      │ AWS::IAM::Role           │ Provides access for the Lambda GraphQL Handler to access datasource resources              ║
+  # ║ IAMRoleLambdaTeamCredentials     │ AWS::IAM::Role           │ Provides access to Cognito resources for the gdQuests-EventUI-TeamCredentials function     ║
+  # ║ IamRoleMockOpsRole               │ AWS::IAM::Role           │ Mock role to simulate Event Engine cross-account assumpition of the ops role               ║
+  # ╚══════════════════════════════════╧══════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════╝
+  # IamRoleApiGateway:
+
+  IAMRoleAppSyncAPI:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - appsync.amazonaws.com
+          Action:
+          - 'sts:AssumeRole'
+      Description: Provides AppSync with the ability to call the GraphQLHandler Lambda function
+      Path: /gdQuests/
+      Policies:
+      - PolicyName: LambdaAccessPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action: lambda:InvokeFunction
+            Resource: !GetAtt LambdaGraphQLHandler.Arn
+      RoleName: gdQuestsUi-AppSyncRole
+
+  IamRoleCloudFormation:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - cloudformation.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Description: Provides permissions for CloudFormation resources to deploy quests.
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AdministratorAccess
+      Path: /gdQuests/
+      RoleName: gdQuestsApi-CloudFormationRole
+
+  IamRoleLambda:
+    Type: AWS::IAM::Role
+    DependsOn: 
+      - QDKImage
+      - Event
+      - Interactions
+      - Scoring
+      - Cron
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Description: Provides permissions for internally-invoked Lambda resources
+      Path: /gdQuests/
+      Policies:
+      - PolicyName: AppSyncPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action: appsync:GraphQL
+            Resource: !Sub ${AppSyncAPI}/*
+      - PolicyName: CloudFormationPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action: 
+            - cloudformation:CreateStack
+            - cloudformation:DeleteStack
+            - cloudformation:DescribeStacks
+            - cloudformation:DeleteStackInstances
+            - cloudformation:ListStackInstances
+            - cloudformation:DeleteStackSet
+            - cloudformation:DescribeStackSetOperation
+            Resource: "*"
+      - PolicyName: CloudWatchLogsPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            Resource: !Join
+            - ''
+            - - 'arn:aws:logs:'
+              - !Ref AWS::Region
+              - ':'
+              - !Ref AWS::AccountId
+              - ':*'
+          - Effect: Allow
+            Action:
+            - logs:CreateLogStream
+            - logs:DescribeLogStreams
+            - logs:PutLogEvents
+            Resource: !Join
+            - ''
+            - - 'arn:aws:logs:'
+              - !Ref AWS::Region
+              - ':'
+              - !Ref AWS::AccountId
+              - ':log-group:/aws/lambda/gdQuests*:*'
+      - PolicyName: DynamoDBPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action: 
+            - dynamodb:DeleteItem
+            - dynamodb:PutItem
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:UpdateItem
+            - dynamodb:GetItem
+            Resource: !Join
+            - ''
+            - - 'arn:aws:dynamodb:'
+              - !Ref AWS::Region
+              - ':'
+              - !Ref AWS::AccountId
+              - ':table/gdQuestsApi-*'
+      - PolicyName: SecretsPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action: 
+            - secretsmanager:GetSecretValue
+            - secretsmanager:DeleteSecret
+            Resource:
+            - !Ref SecretsManagerQuestsApiToken
+            - !Join
+              - ''
+              - - 'arn:aws:secretsmanager:'
+                - !Ref AWS::Region
+                - ':'
+                - !Ref AWS::AccountId
+                - ':secret:gdQuests/*'
+          - Effect: Allow
+            Action:
+            - secretsmanager:ListSecrets
+            - ssm:GetParameter
+            Resource: "*"
+      - PolicyName: ParametersPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - ssm:GetParameter
+            Resource: "*"
+      - PolicyName: SNSPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action: 
+            - sns:Publish
+            - sns:Subscribe
+            Resource: !Join
+            - ''
+            - - 'arn:aws:sns:'
+              - !Ref AWS::Region
+              - ':'
+              - !Ref AWS::AccountId
+              - ':*'
+      - PolicyName: OtherPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action: 
+            - iam:PassRole
+            - lambda:AddPermission
+            - s3:GetObject
+            - states:StartExecution
+            - codepipeline:StartPipelineExecution
+            - sts:assumeRole
+            - codepipeline:PutJobSuccessResult
+            - codepipeline:PutJobFailureResult
+            Resource: "*"
+      - PolicyName: DevQuestBootstrapPolicy
+        PolicyDocument: 
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action: 
+              - s3:*
+              Resource:
+              - !Join ['', ['arn:aws:s3:::', !Ref devAssetsBucket, '/*'] ]
+              - !Join ['', [ !GetAtt QDKArtifactBucket.Arn, '/*' ] ]
+              - !Join ['', [ !GetAtt QDKArtifactBucket.Arn, ''] ]
+              - !Join ['', ['arn:aws:s3:::', !Ref gdQuestsEEAssetsBucketPrefix, !Ref AWS::Region, '/*'] ]
+            - Effect: Allow
+              Action:
+                - ecr:*
+              Resource:
+                - !GetAtt QDKImage.Arn
+                - !GetAtt Event.Arn
+                - !GetAtt Interactions.Arn
+                - !GetAtt Scoring.Arn
+                - !GetAtt Cron.Arn
+      RoleName: gdQuestsApi-lambdaRole
+
+  IAMRoleLambdaDeployEventUI:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - 'sts:AssumeRole'
+      Description: Provides access to an S3 bucket so that the EventUI can be deployed
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: /gdQuests/
+      Policies:
+      - PolicyName: S3Policy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action: 
+            - s3:GetObject
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - s3:DeleteObject
+            - s3:GetObject
+            - s3:ListBucket
+            - s3:PutObject
+            Resource:
+            - !GetAtt gdQuestsEventUIS3Bucket.Arn
+            - !Join [ '', [ !GetAtt gdQuestsEventUIS3Bucket.Arn, '/*' ] ]
+      RoleName: gdQuestsUi-LambdaDeployEventUIRole
+                          
+  IAMRoleLambdaGraphQLHandler:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - 'sts:AssumeRole'
+      Description: Provides access for the Lambda GraphQL Handler to access datasource resources
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: /gdQuests/
+      Policies:
+      - PolicyName: AppSyncPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action: appsync:GraphQL
+            Resource: !Sub ${AppSyncAPI}/*
+      - PolicyName: SecretsManagerPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+              - secretsmanager:GetSecretValue
+              Resource: !Ref SecretsManagerQuestsApiToken
+      - PolicyName: SNSPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action: sns:Publish
+            Resource:
+            - !Ref SnsQuestsApiTopic
+      RoleName: gdQuestsUi-LambdaGraphQlHandlerRole
+                          
+  IAMRoleLambdaTeamCredentials:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - 'sts:AssumeRole'
+      Description: Provides access to Cognito resources for the gdQuests-EventUI-TeamCredentials Lambda function
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Path: /gdQuests/
+      Policies:
+      - PolicyName: root
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - cognito-idp:AdminCreateUser
+            - cognito-idp:AdminSetUserPassword
+            - cognito-idp:AdminGetUser
+            Resource:
+            - !GetAtt CognitoUserPool.Arn
+          - Effect: Allow
+            Action:
+            - secretsmanager:PutSecretValue
+            - secretsmanager:CreateSecret
+            Resource: !Join
+            - ''
+            - - 'arn:aws:secretsmanager:'
+              - !Ref AWS::Region
+              - ':'
+              - !Ref AWS::AccountId
+              - ':secret:gdQuests/*'
+          - Effect: Allow
+            Action:
+            - secretsmanager:ListSecrets
+            Resource: "*"
+
+  IamRoleMockOpsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            AWS: !Join
+            - ''
+            - - 'arn:aws:iam::'
+              - !Ref AWS::AccountId
+              - ':root'
+          Action:
+          - sts:AssumeRole
+      Description: Mock role to simulate Event Engine cross-account assumpition of the ops role.
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AdministratorAccess
+      RoleName: OpsRole
+      
+  # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+  # ║ Lambda Resources                                                                                                                                         ║
+  # ╠═══════════════════════════════╤═════════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════╣
+  # ║ LambdaAwardScore              │ AWS::Lambda::Function       │ Command:       Awards points to a team (creates an ad-hoc score event)                     ║
+  # ║ LambdaCron                    │ AWS::Lambda::Function       │ Orchestration: Runs Cron-based orchestration tasks for the Quests module                   ║
+  # ║ LambdaCronPerms               │ AWS::Lambda::Permission     │ Orchestration: Authorises CloudWatch Events to invoke the gdQuestsApi-Cron Lambda function ║
+  # ║ LambdaDeployEventUI           │ AWS::Lambda::Function       │ EventUI:       Deploys the Event UI                                                        ║
+  # ║ LambdaEnableQuest             │ AWS::Lambda::Function       │ Development:   Allows Quest developers to enable a quest during testing                    ║
+  # ║ LambdaEnableQuestForTeams     │ AWS::Lambda::Function       │ Orchestration: Executes Step Function that deploys/deletes Team Enable CFn stacks          ║
+  # ║ LambdaGetEventStatus          │ AWS::Lambda::Function       │ API:           Obtains the status of the GameDay event from the Event Engine API           ║
+  # ║                               │                             │                Event Engine API                                                            ║
+  # ║ LambdaGraphQLHandler          │ AWS::Lambda::Function       │ EventUI:       Middleware between AppSync and QuestsAPI                                    ║
+  # ║ LambdaLayerPandas             │ AWS::Lambda::LayerVersion   │ Layer:         Lambda Layer that provides the Python pandas package (and dependencies)     ║
+  # ║ LambdaLayerGqlRequests        │ AWS::Lambda::LayerVersion   │ Layer:         Lambda Layer that provides the Python gql and requests packages             ║
+  # ║                               │                             │                (and dependencies)                                                          ║
+  # ║ LambdaLayerRequests           │ AWS::Lambda::LayerVersion   │ Layer:         Lambda Layer that provides the Python requests package (and dependencies)   ║
+  # ║ LambdaLoadQuestsData          │ AWS::Lambda::Function       │ Orchestration: Populates the Quests DynamoDB table upon module deployment                  ║
+  # ║ LambdaMockEvents              │ AWS::Lambda::Function       │ Development:   Deployed when outside the context of the Event Engine, populates and allows ║
+  # ║                               │                             │                for the modification of event data in the Mock Events table                 ║
+  # ║ LambdaMockTeams               │ AWS::Lambda::Function       │ Development:   Deployed when outside the context of the Event Engine, populates and allows ║
+  # ║ LambdaProcessResourceLocks    │ AWS::Lambda::Function       │ Orchestration: Processes CFn stack outputs to determine what resources and actions teams   ║
+  # ║                               │                             │                should be prevented from doing                                              ║
+  # ║ LambdaProcessSnsMessages      │ AWS::Lambda::Function       │ Messaging:     Processes messages sent to the EE Lifecycle Topic (or the Mock SNS Topic    ║
+  # ║                               │                             │                when deployed outside the context of the Event Engine)                      ║
+  # ║ LambdaProcessSnsMessagesPerms │ AWS::Lambda::Permission     │ Messaging:     Authorises the EE Lifecycle Topic or Mock SNS Topic to invoke the           ║
+  # ║                               │                             │                gdQuestsApi-ProcessSnsMessages Lambda function                              ║
+  # ║ LambdaRecalculateAverages     │ AWS::Lambda::Function       │ Orchestration: Function that can be manually executed to recalculate the new average quest ║
+  # ║                               │                             │                duration at the end of an event                                             ║
+  # ║                               │                             │                topic used by GameDay 2020                                                  ║
+  # ║ LambdaTeamCredentials         │ AWS::Lambda::Function       │ EventUI:       Allows for the management of the team credentials that provide access to    ║
+  # ║                               │                             │                the Quests Event UI.                                                        ║
+  # ║ LambdaUpdateTeamQuestStatus   │ AWS::Lambda::Function       │ Orchestration: Updates a team's quest status in the Quest Status table                     ║
+  # ╚═══════════════════════════════╧═════════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════╝
+  LambdaAwardScore:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsBucketPrefix
+          - !Ref AWS::Region
+        S3Key: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsKeyPrefix
+          - !Ref gdQuestsLambdaSourceKey
+      Description: "AWS GameDay Quests Command: Awards points to a team"
+      FunctionName: gdQuestsCmd-AwardScore
+      Handler: gdQuestsCmd-AwardScore.lambda_handler
+      Layers:
+      - !Ref LambdaLayerGqlRequests
+      MemorySize: 512
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.9
+      Timeout: 30
+
+  LambdaCron:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsBucketPrefix
+          - !Ref AWS::Region
+        S3Key: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsKeyPrefix
+          - !Ref gdQuestsLambdaSourceKey
+      Description: "AWS GameDay Quests Orchestration: Runs Cron-based orchestration tasks for the Quests module"
+      Environment:
+        Variables:
+          EE_API_BASE: "Null"
+          EE_API_TOKEN: "Null"
+          EE_EVENT_ID: "Null"
+          EE_MODULE_ID: "Null"
+          QUESTS_GQL_URL: !GetAtt AppSyncAPI.GraphQLUrl
+          API_BASE_URI:  !Join  ['',[ "https://", !Ref QDKHTTPApi,".execute-api.", !Ref AWS::Region, ".amazonaws.com"]]
+          API_TOKEN_SECRET_ARN: !Ref SecretsManagerQuestsApiToken
+          EE_ASSETS_BUCKET: !Ref gdQuestsEEAssetsBucketPrefix
+          EE_ASSETS_KEY_PREFIX: !Ref gdQuestsEEAssetsKeyPrefix
+      FunctionName: gdQuestsOrch-Cron
+      Handler: gdQuestsOrch-Cron.lambda_handler
+      Layers:
+      - !Ref LambdaLayerPandas
+      - !Ref LambdaLayerGqlRequests
+      - !Ref LambdaLayerQDK
+      MemorySize: 512
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.9
+      Timeout: 50
+
+  LambdaCronPerms:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt LambdaCron.Arn
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventsRuleLambdaCron.Arn
+
+  LambdaDeployEventUI:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Join [ '', [ !Ref gdQuestsEEAssetsBucketPrefix, !Ref AWS::Region ] ]
+        S3Key: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, !Ref EventUILambdaSourceKey ] ]
+      Description: "AWS GameDay Quests EventUI: Deploys the Event UI"
+      Environment:
+        Variables:
+          AUTH_DOMAIN: !Join [ '', [ !Ref CognitoUserPoolDomain, '.auth.', !Ref AWS::Region, '.amazoncognito.com' ] ]
+          CF_DOMAIN: !GetAtt CloudFrontDistribution.DomainName
+          GQL_ENDPOINT: !GetAtt AppSyncAPI.GraphQLUrl
+          LOG_LEVEL: DEBUG
+          S3_SOURCE_BUCKET: !Join [ '', [ !Ref gdQuestsEEAssetsBucketPrefix, !Ref AWS::Region ] ]
+          S3_ICONS_KEY: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, !Ref EventUIIconsKey ] ]
+          S3_SOURCE_KEY: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, !Ref EventUIWebsiteSourceKey ] ]
+          S3_TARGET_BUCKET: !Ref gdQuestsEventUIS3Bucket
+          S3_TARGET_PATH: /
+          USER_POOL_ID: !Ref CognitoUserPool
+          USER_POOL_REDIRECT_BASE: !Join [ '', [ 'https://', !GetAtt CloudFrontDistribution.DomainName, '/' ]]
+          USER_POOL_WEB_CLIENT_ID: !Ref CognitoUserPoolClient
+      FunctionName: gdQuests-EventUI-DeployEventUI
+      Handler: deploy_website.lambda_handler
+      Layers:
+      - !Ref LambdaLayerRequests
+      #- !Ref LambdaLayerQDK
+      Role: !GetAtt IAMRoleLambdaDeployEventUI.Arn
+      Runtime: python3.9
+      Timeout: 300
+
+  LambdaEnableQuest:    # to be removed when enablequest invokes api route directly
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsBucketPrefix
+          - !Ref AWS::Region
+        S3Key: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsKeyPrefix
+          - !Ref gdQuestsLambdaSourceKey
+      Description: "AWS GameDay Quests Development: Allows Quest developers to enable a quest during testing"
+      Environment:
+        Variables:
+          API_BASE_URI:  !Join  ['',[ "https://", !Ref QDKHTTPApi,".execute-api.", !Ref AWS::Region, ".amazonaws.com"]]
+          API_TOKEN_SECRET_ARN: !Ref SecretsManagerQuestsApiToken
+      FunctionName: gdQuestsDev-EnableQuest
+      Handler: gdQuestsDev-EnableQuest.lambda_handler
+      Layers:
+        - !Ref LambdaLayerQDK
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.9
+      Timeout: 10
+
+  LambdaEnableQuestForTeams:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsBucketPrefix
+          - !Ref AWS::Region
+        S3Key: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsKeyPrefix
+          - !Ref gdQuestsLambdaSourceKey
+      Description: "AWS GameDay Quests Orchestration: Executes Step Function that deploys/deletes Team Enable CFn stacks"
+      Environment:
+        Variables:
+          EE_API_BASE: "Null"
+          EE_API_TOKEN: "Null"
+          EE_EVENT_ID: "Null"
+          EE_MODULE_ID: "Null"
+      FunctionName: gdQuestsOrch-EnableQuestForTeams
+      Handler: gdQuestsOrch-EnableQuestForTeams.lambda_handler
+      Layers:
+      - !Ref LambdaLayerRequests
+      - !Ref LambdaLayerQDK
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.9
+      Timeout: 10
+      
+  LambdaGraphQLHandler:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Join [ '', [ !Ref gdQuestsEEAssetsBucketPrefix, !Ref AWS::Region ] ]
+        S3Key: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, !Ref EventUILambdaSourceKey ] ]
+      Description: "AWS GameDay Quests EventUI: Middleware between AppSync and QuestsAPI"
+      Environment:
+        Variables:
+          DEPLOY_ASSETS_BUCKET: !If
+          - DeployFromEE
+          - !Join
+            - ''
+            - - !Ref gdQuestsEEAssetsBucketPrefix
+              - !Ref AWS::Region
+          - !Ref devAssetsBucket
+          DEPLOY_KEY_PREFIX: !If
+          - DeployFromEE
+          - !Ref gdQuestsEEAssetsKeyPrefix
+          - !Ref devAssetsKeyPrefix
+          EE_API_BASE: "Null"
+          EE_API_TOKEN: "Null"
+          EE_EVENT_ID: "Null"
+          EE_MODULE_ID: "Null"
+          QUESTS_CONTEXT: Development
+          QUESTS_GQL_URL: !GetAtt AppSyncAPI.GraphQLUrl
+          QUESTS_SECRET_ARN: !Ref SecretsManagerQuestsApiToken
+          API_BASE_URI: !Join  ['',[ "https://", !Ref QDKHTTPApi,".execute-api.", !Ref AWS::Region, ".amazonaws.com"]]
+          LOG_LEVEL: INFO
+          QUESTS_SNS_TOPIC_ARN: !Ref SnsQuestsApiTopic
+      FunctionName: gdQuests-EventUI-GraphQLHandler
+      Handler: graphql_handler.lambda_handler
+      Layers:
+      - !Ref LambdaLayerGqlRequests
+      - !Ref LambdaLayerQDK
+      MemorySize: 128
+      Role: !GetAtt IAMRoleLambdaGraphQLHandler.Arn
+      Runtime: python3.9
+      Timeout: 10
+ 
+  LambdaLayerPandas:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+      - python3.9
+      Content:
+        S3Bucket: !Join [ '', [ !Ref gdQuestsEEAssetsBucketPrefix, !Ref AWS::Region ] ]
+        S3Key: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, gameday-quests-pandas-lambda-layer.zip ] ]
+      Description: Lambda Layer that provides the Python pandas package (and dependencies)
+      LayerName: gdQuests-python-pandas
+
+  LambdaLayerGqlRequests:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+      - python3.9
+      Content:
+        S3Bucket: !Join [ '', [ !Ref gdQuestsEEAssetsBucketPrefix, !Ref AWS::Region ] ]
+        S3Key: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, gameday-quests-gql-requests-lambda-layer.zip ] ]
+      Description: Lambda Layer that provides the Python gql and requests packages (and dependencies)
+      LayerName: gdQuests-python-gql-requests
+
+  LambdaLayerQDK:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+      - python3.9
+      Content:
+        S3Bucket: !Join [ '', [ !Ref gdQuestsEEAssetsBucketPrefix, !Ref AWS::Region ] ]
+        S3Key: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, gameday-quests-qdk-lambda-layer.zip ] ]
+      Description: Lambda Layer that provides the QDK packages (and dependencies)
+      LayerName: gdQuests-python-qdk
+
+  LambdaLayerRequests:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      CompatibleRuntimes:
+      - python3.9
+      Content:
+        S3Bucket: !Join [ '', [ !Ref gdQuestsEEAssetsBucketPrefix, !Ref AWS::Region ] ]
+        S3Key: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, gameday-quests-requests-lambda-layer.zip ] ]
+      Description: Lambda Layer that provides the Python requests package (and dependencies)
+      LayerName: gdQuests-python-requests
+
+  LambdaLoadQuestsData:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsBucketPrefix
+          - !Ref AWS::Region
+        S3Key: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsKeyPrefix
+          - !Ref gdQuestsLambdaSourceKey
+      Description: "AWS GameDay Quests Orchestration: Populates the Quests DynamoDB table upon module deployment "
+      Environment:
+        Variables:
+          EE_API_BASE: "Null"
+          EE_API_TOKEN: "Null"
+          EE_EVENT_ID: "Null"
+          EE_MODULE_ID: "Null"
+          API_BASE_URI: !Join  ['',[ "https://", !Ref QDKHTTPApi,".execute-api.", !Ref AWS::Region, ".amazonaws.com"]]
+          API_TOKEN_SECRET_ARN: !Ref SecretsManagerQuestsApiToken
+          QUESTS_DATA_BUCKET: !If
+          - DeployFromEE
+          - !Join
+            - ''
+            - - !Ref gdQuestsEEAssetsBucketPrefix
+              - !Ref AWS::Region
+          - !Ref devAssetsBucket
+          QUESTS_DATA_KEY: !If
+          - DeployFromEE
+          - !Join
+            - ''
+            - - !Ref gdQuestsEEAssetsKeyPrefix
+              - 'quests-data.json'
+          - !Join
+            - ''
+            - - !Ref devAssetsKeyPrefix
+              - !Ref devQuestsData
+      FunctionName: gdQuestsOrch-LoadQuestsData
+      Handler: gdQuestsOrch-LoadQuestsData.lambda_handler
+      Layers:
+      - !Ref LambdaLayerRequests
+      - !Ref LambdaLayerQDK
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.9
+      Timeout: 120
+      
+  LambdaMockEvents:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsBucketPrefix
+          - !Ref AWS::Region
+        S3Key: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsKeyPrefix
+          - !Ref gdQuestsLambdaSourceKey
+      Description: "AWS GameDay Quests Development: Populates and allows for the modification of event data in the Mock Events table"
+      Environment:
+        Variables:
+          MOCK_EVENTS_TABLE: !Ref DynamoDbMockEventsTable
+          MOCK_SNS_TOPIC_ARN: !Ref SnsMockTopic
+      FunctionName: gdQuestsDev-MockEvents
+      Handler: gdQuestsDev-MockEvents.lambda_handler
+      Layers:
+      - !Ref LambdaLayerRequests
+      - !Ref LambdaLayerQDK
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.9
+      Timeout: 30
+
+  LambdaMockTeams:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsBucketPrefix
+          - !Ref AWS::Region
+        S3Key: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsKeyPrefix
+          - !Ref gdQuestsLambdaSourceKey
+      Description: "AWS GameDay Quests Development: Populates and allows for the modification of team data in the Mock Teams table"
+      Environment:
+        Variables:
+          ACCOUNT_ID: !Ref AWS::AccountId
+          EE_MODULE_ID: "Null"
+          MOCK_SNS_TOPIC_ARN: !Ref SnsMockTopic
+          MOCK_TEAMS_TABLE: !Ref DynamoDbMockTeamsTable
+      FunctionName: gdQuestsDev-MockTeams
+      Handler: gdQuestsDev-MockTeams.lambda_handler
+      Layers:
+      - !Ref LambdaLayerRequests
+      - !Ref LambdaLayerQDK
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.9
+      Timeout: 30
+
+  # LambdaPostHintForQuest:
+  # LambdaPostImage:
+  # LambdaPostInput:
+  # LambdaPostOutput:
+  # LambdaPostQuestComplete:
+  # LambdaPostQuestStart:
+
+  LambdaProcessSnsMessages:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsBucketPrefix
+          - !Ref AWS::Region
+        S3Key: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsKeyPrefix
+          - !Ref gdQuestsLambdaSourceKey
+      Description: "AWS GameDay Quests Messaging: Processes messages sent to the EE Lifecycle topic (or the Mock SNS Topic when deployed outside the context of the Event Engine)"
+      Environment:
+        Variables:
+          EE_API_BASE: "Null"
+          EE_API_TOKEN: "Null"
+          EE_EVENT_ID: "Null"
+          EE_MODULE_ID: "Null"
+          API_BASE_URI: !Join  ['',[ "https://", !Ref QDKHTTPApi,".execute-api.", !Ref AWS::Region, ".amazonaws.com"]]
+          API_TOKEN_SECRET_ARN: !Ref SecretsManagerQuestsApiToken
+          QUESTS_SNS_TOPIC_ARN: !Ref SnsQuestsApiTopic
+      FunctionName: gdQuestsMess-ProcessSnsMessages
+      Handler: gdQuestsMess-ProcessSnsMessages.lambda_handler
+      Layers:
+      - !Ref LambdaLayerRequests
+      - !Ref LambdaLayerQDK
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.9
+      Timeout: 30
+
+  LambdaProcessSnsMessagesPerms:
+    Type: AWS::Lambda::Permission
+    Properties: 
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaProcessSnsMessages
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref SnsMockTopic
+
+  LambdaRecalculateAverages:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsBucketPrefix
+          - !Ref AWS::Region
+        S3Key: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsKeyPrefix
+          - !Ref gdQuestsLambdaSourceKey
+      Description: "AWS GameDay Quests Orchestration: Function that can be manually executed to recalculate the new average quest duration at the end of an event"
+      Environment:
+        Variables:
+          API_BASE_URI: !Join  ['',[ "https://", !Ref QDKHTTPApi,".execute-api.", !Ref AWS::Region, ".amazonaws.com"]]
+          API_TOKEN_SECRET_ARN: !Ref SecretsManagerQuestsApiToken
+      FunctionName: gdQuestsOrch-RecalculateAverages
+      Handler: gdQuestsOrch-RecalculateAverages.lambda_handler
+      Role: !GetAtt IamRoleLambda.Arn
+      Layers:
+        - !Ref LambdaLayerQDK
+      Runtime: python3.9
+      Timeout: 10
+
+  LambdaTeamCredentials:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Join [ '', [ !Ref gdQuestsEEAssetsBucketPrefix, !Ref AWS::Region ] ]
+        S3Key: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, !Ref EventUILambdaSourceKey ] ]
+      Description: "AWS GameDay Quests EventUI: Allows for the management of the team credentials that provide access to the Quests Event UI"
+      Environment:
+        Variables:
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPool
+          EE_API_BASE: "Null"
+          EE_API_TOKEN: "Null"
+          EE_EVENT_ID: "Null"
+          EE_MODULE_ID: "Null"
+          EVENT_UI_URL: !Join [ '', [ 'https://', !GetAtt CloudFrontDistribution.DomainName, '/' ] ]
+          LOG_LEVEL: INFO
+      FunctionName: gdQuests-EventUI-TeamCredentials
+      Handler: team_credentials.lambda_handler
+      MemorySize: 128
+      Layers:
+      - !Ref LambdaLayerRequests
+      - !Ref LambdaLayerQDK
+      Role: !GetAtt IAMRoleLambdaTeamCredentials.Arn
+      Runtime: python3.9
+      Timeout: 30
+
+  # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+  # ║ S3 Resources                                                                                                                                             ║
+  # ╠═══════════════════════════════╤═════════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════╣
+  # ║ gdQuestsEventUIS3Bucket       │ AWS::S3::Bucket             │ The S3 bucket that stores the Event UI                                                     ║
+  # ║ S3BucketDevAssets             │ AWS::S3::Bucket             │ S3 bucket for assets if using a Development Account instead of the Event Engine            ║
+  # ║ S3BucketPolicygdQuestsEventUI │ AWS::S3::BucketPolicy       │ The S3 bucket policy granting access to the S3 bucket for CloudFront Origin Access         ║
+  # ║                               │                             │ Identity                                                                                   ║
+  # ╚═══════════════════════════════╧═════════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════╝
+  # DevAssetsBucketReady:
+  #   Type: AWS::CloudFormation::WaitConditionHandle
+  #   Metadata: 
+  #     OptionalCreatedBucketReady: !If
+  #     - CreateDevAssetsBucket
+  #     - !Ref S3BucketDevAssets
+  #     - ''  
+
+  gdQuestsEventUIS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
+
+  # S3BucketDevAssets:
+  #   Type: AWS::S3::Bucket
+  #   Condition: CreateDevAssetsBucket
+  #   Properties: 
+  #     BucketName: !Join
+  #       - ''
+  #       - - 'gdQuests-Development-'
+  #         - !Ref AWS::AccountId
+  #         - '-'
+  #         - !Ref AWS::Region
+  #     AccessControl: AuthenticatedRead
+  #     PublicAccessBlockConfiguration: 
+  #       BlockPublicAcls: true
+  #       BlockPublicPolicy: true 
+  #       IgnorePublicAcls: true
+  #       RestrictPublicBuckets: true
+
+  S3BucketPolicygdQuestsEventUI:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref gdQuestsEventUIS3Bucket
+      PolicyDocument:
+        Statement:
+        - Action: s3:GetObject
+          Effect: Allow
+          Resource: !Join [ '', [ 'arn:aws:s3:::', !Ref gdQuestsEventUIS3Bucket, '/*' ] ]
+          Principal:
+            CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+        - Action: s3:ListBucket
+          Effect: Allow
+          Resource: !Join [ '', [ 'arn:aws:s3:::', !Ref gdQuestsEventUIS3Bucket ] ]
+          Principal:
+            CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+ 
+  # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+  # ║ Secrets Manager Resources                                                                                                                                ║
+  # ╠═══════════════════════════════════════╤═════════════════════════════╤════════════════════════════════════════════════════════════════════════════════════╣
+  # ║ SecretsManagerQuestsApiToken          │ AWS::SecretsManager::Secret │ The secret used as the Quests API authorization token                              ║
+  # ╚═══════════════════════════════════════╧═════════════════════════════╧════════════════════════════════════════════════════════════════════════════════════╝
+  SecretsManagerQuestsApiToken:
+    Type: AWS::SecretsManager::Secret
+    Properties: 
+      Name: QuestsApiToken
+      Description: The secret used as the Quests API authorization token
+      GenerateSecretString:
+        ExcludePunctuation: true
+
+  # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+  # ║ SNS Resources                                                                                                                                            ║
+  # ╠═══════════════════════════════╤═════════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════╣
+  # ║ SnsMockTopic                  │ AWS::SNS::Topic             │ Deployed when outside the context of the Event Engine, mocks the functionality of the      ║
+  # ║                               │                             │   Event Engine's Lifecycle Topic                                                           ║
+  # ║ SnsQuestsApiTopic             │ AWS::SNS::Topic             │ SNS Topic that is published to from the Quests API and subscribed to by Quests             ║
+  # ║ SnsSubProcessEEMessages       │ AWS::SNS::Subscription      │ SNS subscription for the gdQuestsApi-ProcessSnsMessages Lambda function                    ║
+  # ╚═══════════════════════════════╧═════════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════╝
+  SnsMockTopic:
+    Type: AWS::SNS::Topic
+
+  SnsQuestsApiTopic:
+    Type: AWS::SNS::Topic
+
+  SnsQuestsApiTopicParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: gdQuests-api-topic
+      Type: String
+      Value: !Ref SnsQuestsApiTopic
+      Description: SSM Parameter for the SNS Quest Api topic
+
+  SnsSubProcessEEMessages:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt LambdaProcessSnsMessages.Arn
+      Protocol: lambda
+      TopicArn: !Ref SnsMockTopic 
+
+  # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+  # ║ Custom Resources                                                                                                                                         ║
+  # ╠═══════════════════════════════╤═══════════════════════════════╤══════════════════════════════════════════════════════════════════════════════════════════╣
+  # ║ PopulateMockEventsTable       │ Custom::LambdaMockEvents      │ Deployed when outside the context of the Event Engine, populates the Mock Events table   ║
+  # ║                               │                               │   with initial data suited for testing outside of the Event Engine                       ║
+  # ║ PopulateMockTeamsTable        │ Custom::LambdaMockTeams       │ Deployed when outside the context of the Event Engine, populates the Mock Teams table    ║
+  # ║                               │                               │   with initial data suited for testing outside of the Event Engine                       ║
+  # ║ SubscribeUPLSns               │ Custom::LambdaSubscribeUPLSns │ Subscribes the SNS Processing function to the GameDay 2020 SNS Topic (if it exists)      ║
+  # ╚═══════════════════════════════╧═══════════════════════════════╧══════════════════════════════════════════════════════════════════════════════════════════╝
+  DeployEventUI:
+    Type: Custom::DeployEventUI
+    Properties:
+      ServiceToken: !GetAtt LambdaDeployEventUI.Arn
+
+  PopulateMockEventsTable:
+    Type: Custom::LambdaMockEvents
+    Properties:
+      ServiceToken: !GetAtt LambdaMockEvents.Arn
+    DependsOn: EventService
+
+  PopulateMockTeamsTable:
+    Type: Custom::LambdaMockTeams
+    Properties:
+      ServiceToken: !GetAtt LambdaMockTeams.Arn
+
+  PipelineInit:
+    Type: Custom::LambdaPipelineInit
+    Properties:
+      ServiceToken: !GetAtt LambdaPipelineInit.Arn
+      QDKEcrRepoName: !Ref QDKImage
+      InteractionsEcrRepoName: !Ref Interactions
+      EventEcrRepoName: !Ref Event
+      ScoringEcrRepoName: !Ref Scoring
+      CronEcrRepoName: !Ref Cron
+      QDKArtifactBucketName: !Ref QDKArtifactBucket
+    DependsOn: LambdaPipelineInit
+
+  LambdaPipelineInit:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsBucketPrefix
+          - !Ref AWS::Region
+        S3Key: !Join
+        - ''
+        - - !Ref gdQuestsEEAssetsKeyPrefix
+          - !Ref gdQuestsLambdaSourceKey
+      Description: "AWS GameDay Quests Development: Populates the S3 Bucket that seeds the QDK ECR Pipeline"
+      Environment:
+        Variables:
+          QDK_ASSETS_BUCKET: !Join
+          - ''
+          - - !Ref gdQuestsEEAssetsBucketPrefix
+            - !Ref AWS::Region
+          QDK_ASSETS_PREFIX: !Ref gdQuestsEEAssetsKeyPrefix
+          QDK_ASSETS_CODE_OBJECT: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, aws_gameday_api.zip ] ]
+      FunctionName: gdQuestsOrch-PipelineInit
+      Handler: gdQuestsOrch-PipelineInit.lambda_handler
+      Layers:
+      - !Ref LambdaLayerRequests
+      - !Ref LambdaLayerQDK
+      Role: !GetAtt IamRoleLambda.Arn
+      Runtime: python3.9
+      Timeout: 90
+
+  QuestPipelineRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: qdk-api-repository
+      RepositoryDescription:  This is the QDK repository in CodeCommit
+      Code:
+        S3:
+          Bucket: !Join
+          - ''
+          - - !Ref gdQuestsEEAssetsBucketPrefix
+            - !Ref AWS::Region
+          Key: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, aws_gameday_api.zip ] ]
+    DependsOn: PipelineInit
+
+  QDKImage:
+    Type: AWS::ECR::Repository
+
+# This role is used by CodePipeline to trigger deployments
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "codepipeline.amazonaws.com"
+                - "cloudformation.amazonaws.com"
+                - "codedeploy.amazonaws.com"
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:GetBucketVersioning
+              - Resource: "arn:aws:s3:::*"
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - codecommit:*
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                  - iam:PassRole
+                  - iam:CreateRole
+                  - iam:DetachRolePolicy
+                  - iam:AttachRolePolicy
+                  - iam:PassRole
+                  - iam:PutRolePolicy
+                  - cloudwatch:*
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - ecs:*
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - ecr:GetAuthorizationToken
+              - Resource: !Sub arn:aws:s3:::${QDKArtifactBucket}/*
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:GetObjectVersion
+              - Resource:
+                  - !Sub arn:aws:s3:::codepipeline-${AWS::Region}-*
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+              - Effect: Allow
+                Action:
+                  - ecr:*
+                Resource:
+                  - !GetAtt QDKImage.Arn
+                  - !GetAtt Interactions.Arn
+                  - !GetAtt Event.Arn
+                  - !GetAtt Scoring.Arn
+                  - !GetAtt Cron.Arn
+              - Effect: Allow
+                Action:
+                - lambda:InvokeFunction
+                Resource: "*"
+
+
+  # CodeBuild needs a place to put artifacts in the interim.
+  QDKArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+
+  # Actual CodeBuild project that builds the Docker images and outputs imagedefinitions.json
+  DockerBuildCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: "CODEPIPELINE"
+      Source:
+        Type: "CODEPIPELINE"
+        BuildSpec: "buildspec_prod.yml"
+      Environment:
+        PrivilegedMode: true
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/standard:5.0"
+        Type: "LINUX_CONTAINER"
+        EnvironmentVariables:
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+            Type: PLAINTEXT
+          - Name: REPOSITORY_URI
+            # QDKImage ECR
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${QDKImage}
+            Type: PLAINTEXT
+      Name: !Sub ${AWS::StackName}-qdkimage-service-build
+      ServiceRole: !Ref CodePipelineServiceRole
+
+  # CodePipeline for deployments. Uses CodeCommit + CodeBuild + ECS, deploying
+  # to an existing ECS service. It looks for imagedefinitions.json as well as
+  # buildspec_prod for this
+  QDKImageServicePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !Ref QDKArtifactBucket
+      Name: !Sub ${AWS::StackName}
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      Stages:
+        - Name: 'Source'
+          Actions:
+            - Name: 'Source'
+              ActionTypeId:
+                Category: 'Source'
+                Owner: 'AWS'
+                Version: '1'
+                Provider: CodeCommit
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                BranchName: main
+                RepositoryName: qdk-api-repository
+              RunOrder: 1
+        - Name: 'Build_Docker_Container'
+          Actions:
+            - Name: CodeBuild
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ProjectName: !Ref DockerBuildCodeBuildProject
+              RunOrder: 1
+
+  # CodePipeline does not automatically create this for you as part of
+  # creation, but this role is for the CWE Hook to trigger CodePipeline once
+  # there's an update in CodeCommit. Otherwise, we have to have CodePipeline
+  # poll for changes, which is slower.
+  S3CloudWatchEventRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: cwe-pipeline-execution
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: codepipeline:StartPipelineExecution
+                Resource: !Sub arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${QDKImageServicePipeline}
+
+  QDKImageECRRepositoryParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: gdQuests-api-qdkimage-ecr-repo
+      Type: String
+      Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${QDKImage}
+      Description: ECR Repository with the source code
+
+  LambdaLayerQDKParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: gdQuests-qdk-lambda-layer
+      Type: String
+      Value: !Ref LambdaLayerQDK
+      Description: Lambda Layer with the QDK packages
+
+  Event:
+    Type: AWS::ECR::Repository
+
+  Interactions:
+    Type: AWS::ECR::Repository
+
+  Scoring:
+    Type: AWS::ECR::Repository
+
+  Cron:
+    Type: AWS::ECR::Repository
+
+  QDKEcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub Cluster-${AWS::StackName}
+
+  QDKEventLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      RetentionInDays: 7
+    # Not for EventEngine
+
+  QDKInteractionsLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      RetentionInDays: 7
+    # Not for EventEngine
+
+  QDKScoringLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      RetentionInDays: 7
+    # Not for EventEngine
+
+
+  QDKCronLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    Properties:
+      RetentionInDays: 7
+    # Not for EventEngine
+
+  QDKEventTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Cpu: 512
+      ExecutionRoleArn: !GetAtt EcsServiceRole.Arn
+      Family: !Sub QDK-Event-Service-${AWS::StackName}
+      Memory: 1024
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: events-service
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Event}:latest
+          PortMappings:
+            - ContainerPort: 80
+              Protocol: http
+          Environment:
+            - Name: UPSTREAM_URL
+              Value: !GetAtt QDKLoadBalancer.DNSName
+            - Name: DDB_TABLE_NAME
+              Value: !Ref DynamoDbQuestStatesTable
+            - Name: REGION
+              Value: !Ref AWS::Region
+            - Name: EE_API_BASE
+              Value: "Null"
+            - Name: EE_API_TOKEN
+              Value: "Null"
+            - Name: EE_EVENT_ID
+              Value: "Null"
+            - Name: EE_MODULE_ID
+              Value: "Null"
+            - Name: API_TOKEN_SECRET_ARN
+              Value: !Ref SecretsManagerQuestsApiToken
+            - Name: API_BASE_PARAM
+              Value: !Ref SSMParameterQDKAPIEndpoint
+            - Name: CLOUDFORMATION_ROLE_ARN
+              Value: !Join [ '', [ 'arn:aws:iam::', !Ref AWS::AccountId, ':role/gdQuests/', !Ref IamRoleCloudFormation ] ]
+            - Name: DEPLOY_ASSETS_BUCKET
+              Value: !Ref devAssetsBucket
+            - Name: DEPLOY_KEY_PREFIX
+              Value: !Ref devAssetsKeyPrefix
+            - Name: QDK_IMAGE_ECR_REPO_PARAM
+              Value: !Ref QDKImageECRRepositoryParam
+            - Name: QUESTS_CONTEXT
+              Value: Development
+            - Name: QUESTS_SNS_TOPIC_PARAM
+              Value: !Ref SnsQuestsApiTopicParam
+            - Name: TRACING_ENABLED
+              Value: !If [ EnableTracing, "True", "False" ]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref QDKEventLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: awslogs-qdk-service
+          Essential: true
+        - Name: xray-daemon
+          Image: amazon/aws-xray-daemon
+          PortMappings:
+            - ContainerPort: 2000
+              Protocol: udp
+
+  QDKInteractionsTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Cpu: 512
+      ExecutionRoleArn: !GetAtt EcsServiceRole.Arn
+      Family: !Sub QDK-Interactions-Service-${AWS::StackName}
+      Memory: 1024
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: interactions-service
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Interactions}:latest
+          PortMappings:
+            - ContainerPort: 80
+              Protocol: http
+          Environment:
+            - Name: QUEST_URL
+              Value: !GetAtt QDKLoadBalancer.DNSName
+            - Name: DDB_TABLE_NAME
+              Value: !Ref DynamoDbOutputsTable
+            - Name: REGION
+              Value: !Ref AWS::Region
+            - Name: TRACING_ENABLED
+              Value: !If [ EnableTracing, "True", "False" ]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref QDKInteractionsLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: awslogs-qdk-service
+          Essential: true
+        - Name: xray-daemon
+          Image: amazon/aws-xray-daemon
+          PortMappings:
+            - ContainerPort: 2000
+              Protocol: udp
+
+  QDKScoringTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Cpu: 512
+      ExecutionRoleArn: !GetAtt EcsServiceRole.Arn
+      Family: !Sub QDK-Scoring-Service-${AWS::StackName}
+      Memory: 1024
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: scoring-service
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Scoring}:latest
+          PortMappings:
+            - ContainerPort: 80
+              Protocol: http
+          Environment:
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+            - Name: TRACING_ENABLED
+              Value: !If [ EnableTracing, "True", "False" ]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref QDKScoringLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: awslogs-qdk-service
+          Essential: true
+        - Name: xray-daemon
+          Image: amazon/aws-xray-daemon
+          PortMappings:
+            - ContainerPort: 2000
+              Protocol: udp
+
+  QDKCronTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Cpu: 512
+      ExecutionRoleArn: !GetAtt EcsServiceRole.Arn
+      Family: !Sub QDK-Cron-Service-${AWS::StackName}
+      Memory: 1024
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: cron-service
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Cron}:latest
+          PortMappings:
+            - ContainerPort: 80
+              Protocol: http
+          Environment:
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+            - Name: TRACING_ENABLED
+              Value: !If [ EnableTracing, "True", "False" ]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref QDKCronLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: awslogs-qdk-service
+          Essential: true
+        - Name: xray-daemon
+          Image: amazon/aws-xray-daemon
+          PortMappings:
+            - ContainerPort: 2000
+              Protocol: udp
+
+  InteractionsService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - QDKListener
+      - QDKInteractionsTaskDefinition
+      - QDKEcsCluster
+    Properties:
+      ServiceName: !Sub ${AWS::StackName}_QDK-Interactions-Service
+      Cluster: !Ref QDKEcsCluster
+      TaskDefinition: !Ref QDKInteractionsTaskDefinition
+      DeploymentConfiguration:
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      DesiredCount: 1
+      # This may need to be adjusted if the container takes a while to start up
+      HealthCheckGracePeriodSeconds: 30
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnetOne
+            - !Ref PrivateSubnetTwo
+          SecurityGroups:
+            - !Ref FargateContainerSecurityGroup
+      LoadBalancers:
+        - ContainerName: interactions-service
+          ContainerPort: 80
+          TargetGroupArn: !Ref QDKInteractionsTargetGroup
+
+  EventService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - QDKEventTaskDefinition
+      - QDKEcsCluster
+      - QDKListener
+    Properties:
+      ServiceName: !Sub ${AWS::StackName}_QDK-Event-Service
+      Cluster: !Ref QDKEcsCluster
+      TaskDefinition: !Ref QDKEventTaskDefinition
+      DeploymentConfiguration:
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      DesiredCount: 1
+      # This may need to be adjusted if the container takes a while to start up
+      HealthCheckGracePeriodSeconds: 60
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnetOne
+            - !Ref PrivateSubnetTwo
+          SecurityGroups:
+            - !Ref FargateContainerSecurityGroup
+      LoadBalancers:
+        - ContainerName: events-service
+          ContainerPort: 80
+          TargetGroupArn: !Ref QDKEventTargetGroup
+
+  ScoringService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - QDKScoringListenerRule
+      - QDKScoringTaskDefinition
+      - QDKEcsCluster
+    Properties:
+      ServiceName: !Sub ${AWS::StackName}_QDK-Scoring-Service
+      Cluster: !Ref QDKEcsCluster
+      TaskDefinition: !Ref QDKScoringTaskDefinition
+      DeploymentConfiguration:
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      DesiredCount: 1
+      # This may need to be adjusted if the container takes a while to start up
+      HealthCheckGracePeriodSeconds: 30
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnetOne
+            - !Ref PrivateSubnetTwo
+          SecurityGroups:
+            - !Ref FargateContainerSecurityGroup
+      LoadBalancers:
+        - ContainerName: scoring-service
+          ContainerPort: 80
+          TargetGroupArn: !Ref QDKScoringTargetGroup
+
+  CronService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - QDKCronListenerRule
+      - QDKCronTaskDefinition
+      - QDKEcsCluster
+    Properties:
+      ServiceName: !Sub ${AWS::StackName}_QDK-Cron-Service
+      Cluster: !Ref QDKEcsCluster
+      TaskDefinition: !Ref QDKCronTaskDefinition
+      DeploymentConfiguration:
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      DesiredCount: 0
+      # This may need to be adjusted if the container takes a while to start up
+      HealthCheckGracePeriodSeconds: 30
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets:
+            - !Ref PrivateSubnetOne
+            - !Ref PrivateSubnetTwo
+          SecurityGroups:
+            - !Ref FargateContainerSecurityGroup
+      LoadBalancers:
+        - ContainerName: cron-service
+          ContainerPort: 80
+          TargetGroupArn: !Ref QDKCronTargetGroup
+
+  VPCLinkSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub vpclink-sg-${AWS::StackName}
+      GroupDescription: Allows access from anywhere on the internet
+      VpcId: !Ref 'VPC'
+      SecurityGroupIngress:
+          # Allow access to VPCLink from anywhere on the internet
+          - IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+            CidrIp: 0.0.0.0/0
+
+  QDKLoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub loadbalancer-sg-${AWS::StackName}
+      GroupDescription: Allows access to from vpc link
+      VpcId: !Ref 'VPC'
+      SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+            Description: Allows access from VPC Link
+            SourceSecurityGroupId: !Ref VPCLinkSecurityGroup
+
+  EventScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      RoleARN: !GetAtt AutoScalingRole.Arn
+      ResourceId: !Sub service/${QDKEcsCluster}/${EventService.Name}
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      MinCapacity: 0
+      MaxCapacity: 5
+
+  EventPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: event-service-auto-scaling-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref EventScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        TargetValue: 75.0
+
+  ScoringScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      RoleARN: !GetAtt AutoScalingRole.Arn
+      ResourceId: !Sub service/${QDKEcsCluster}/${ScoringService.Name}
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      MinCapacity: 0
+      MaxCapacity: 5
+
+  ScoringPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: scoring-service-auto-scaling-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ScoringScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        TargetValue: 75.0
+
+  CronScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      RoleARN: !GetAtt AutoScalingRole.Arn
+      ResourceId: !Sub service/${QDKEcsCluster}/${CronService.Name}
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      MinCapacity: 0
+      MaxCapacity: 5
+
+  CronPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: cron-service-auto-scaling-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref CronScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        TargetValue: 75.0
+
+  InteractionsScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      RoleARN: !GetAtt AutoScalingRole.Arn
+      ResourceId: !Sub service/${QDKEcsCluster}/${InteractionsService.Name}
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      MinCapacity: 0
+      MaxCapacity: 5
+
+  InteractionsPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: interactions-service-auto-scaling-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref InteractionsScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        TargetValue: 75.0
+
+  AutoScalingRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: [application-autoscaling.amazonaws.com]
+              Action: ["sts:AssumeRole"]
+        Policies:
+          - PolicyName: service-auto-scaling-policy
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - ecs:DescribeServices
+                    - ecs:UpdateService
+                    - cloudwatch:PutMetricAlarm
+                    - cloudwatch:DescribeAlarms
+                    - cloudwatch:DeleteAlarms
+                  Resource:
+                    - "*"
+  QDKLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: alb-gdQuests
+      Scheme: internal
+      Type: application
+      SecurityGroups:
+        - !Ref QDKLoadBalancerSecurityGroup
+      Subnets:
+        - !Ref PrivateSubnetOne
+        - !Ref PrivateSubnetTwo
+
+  QDKListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref QDKInteractionsTargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref QDKLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  QDKEventTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      Port: 80
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 30
+      VpcId: !Ref VPC
+      TargetType: ip
+
+  QDKInteractionsTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      Port: 80
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 30
+      VpcId: !Ref VPC
+      TargetType: ip
+
+  QDKScoringTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      Port: 80
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 30
+      VpcId: !Ref VPC
+      TargetType: ip
+
+  QDKCronTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /health
+      HealthCheckProtocol: HTTP
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 3
+      Port: 80
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 30
+      VpcId: !Ref VPC
+      TargetType: ip
+
+  QDKScoringListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref QDKScoringTargetGroup
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/teams/*/score*"
+        - "/teams/*/quests/*/scoreweighting"
+        - /score/rankings
+      ListenerArn: !Ref QDKListener
+      Priority: 1
+
+  QDKTeamsListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref QDKEventTargetGroup
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/teams/*"
+      ListenerArn: !Ref QDKListener
+      Priority: 2
+
+  QDKQuestsListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref QDKEventTargetGroup
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/quests/*"
+      ListenerArn: !Ref QDKListener
+      Priority: 3
+
+  QDKOutputsListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref QDKInteractionsTargetGroup
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/outputs/*"
+      ListenerArn: !Ref QDKListener
+      Priority: 4
+
+  QDKInputsListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref QDKInteractionsTargetGroup
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/inputs/*"
+      ListenerArn: !Ref QDKListener
+      Priority: 5
+
+  QDKHintsListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref QDKInteractionsTargetGroup
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/hints/*"
+      ListenerArn: !Ref QDKListener
+      Priority: 6
+
+  QDKQuestsAllListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref QDKEventTargetGroup
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/quests"
+      ListenerArn: !Ref QDKListener
+      Priority: 7
+
+  QDKTeamsAllListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref QDKEventTargetGroup
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/teams"
+      ListenerArn: !Ref QDKListener
+      Priority: 8
+
+  QDKEventListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref QDKEventTargetGroup
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/event/*"
+      ListenerArn: !Ref QDKListener
+      Priority: 9
+
+  QDKCronListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref QDKCronTargetGroup
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/teams/*/cron*"
+        - "/teams/*/quests/*/cronweighting"
+        - /cron/rankings
+      ListenerArn: !Ref QDKListener
+      Priority: 10
+
+  # VPC in which containers will be networked.
+  # It has two public subnets, and two private subnets.
+  # We distribute the subnets across the first two available subnets
+  # for the region, for high availability.
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !FindInMap ['SubnetConfig', 'VPC', 'CIDR']
+      Tags:
+        - Key: Name
+          Value: !Sub QDK-VPC-${AWS::StackName}
+
+  # Two public subnets, where a public load balancer will later be created.
+  PublicSubnetOne:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 0
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicOne', 'CIDR']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub QDKPublicOne-${AWS::StackName}
+  PublicSubnetTwo:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 1
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicTwo', 'CIDR']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub QDKPublicTwo-${AWS::StackName}
+
+  # Two private subnets where containers will only have private
+  # IP addresses, and will only be reachable by other members of the
+  # VPC
+  PrivateSubnetOne:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 0
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateOne', 'CIDR']
+      Tags:
+        - Key: Name
+          Value: !Sub QDKPrivateOne-${AWS::StackName}
+  PrivateSubnetTwo:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 1
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateTwo', 'CIDR']
+      Tags:
+        - Key: Name
+          Value: !Sub QDKPrivateTwo-${AWS::StackName}
+
+  # Setup networking resources for the public subnets.
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachement:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref 'VPC'
+      InternetGatewayId: !Ref 'InternetGateway'
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachement
+    Properties:
+      RouteTableId: !Ref 'PublicRouteTable'
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref 'InternetGateway'
+  PublicSubnetOneRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetOne
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetTwoRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetTwo
+      RouteTableId: !Ref PublicRouteTable
+
+  # Setup networking resources for the private subnets. Containers
+  # in these subnets have only private IP addresses, and must use a NAT
+  # gateway to talk to the internet. We launch two NAT gateways, one for
+  # each private subnet.
+  NatGatewayOneAttachment:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachement
+    Properties:
+        Domain: vpc
+  NatGatewayTwoAttachment:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachement
+    Properties:
+        Domain: vpc
+  NatGatewayOne:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayOneAttachment.AllocationId
+      SubnetId: !Ref PublicSubnetOne
+  NatGatewayTwo:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayTwoAttachment.AllocationId
+      SubnetId: !Ref PublicSubnetTwo
+  PrivateRouteTableOne:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+  PrivateRouteOne:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableOne
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayOne
+  PrivateRouteTableOneAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableOne
+      SubnetId: !Ref PrivateSubnetOne
+  PrivateRouteTableTwo:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+  PrivateRouteTwo:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableTwo
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayTwo
+  PrivateRouteTableTwoAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableTwo
+      SubnetId: !Ref PrivateSubnetTwo
+
+  # VPC Endpoint for DynamoDB
+  # If a container needs to access DynamoDB this allows a container in the private subnet to talk to DynamoDB directly
+  DynamoDBEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "*"
+            Principal: "*"
+            Resource: "*"
+      RouteTableIds:
+        - !Ref 'PrivateRouteTableOne'
+        - !Ref 'PrivateRouteTableTwo'
+      ServiceName: !Join [ "", [ "com.amazonaws.", { "Ref": "AWS::Region" }, ".dynamodb" ] ]
+      VpcId: !Ref 'VPC'
+
+  FargateContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the fargate containers from the Internet
+      VpcId: !Ref 'VPC'
+      SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 80
+            ToPort: 80
+            Description: Allows access from ALB
+            SourceSecurityGroupId: !Ref QDKLoadBalancerSecurityGroup
+
+  EcsServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ecs.amazonaws.com
+            - ecs-tasks.amazonaws.com
+          Action:
+          - 'sts:AssumeRole'
+      Path: /
+      Policies:
+      - PolicyName: ecs-service
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+              # Rules which allow ECS to attach network interfaces to instances
+              # on your behalf in order for awsvpc networking mode to work right
+              - 'ec2:AttachNetworkInterface'
+              - 'ec2:CreateNetworkInterface'
+              - 'ec2:CreateNetworkInterfacePermission'
+              - 'ec2:DeleteNetworkInterface'
+              - 'ec2:DeleteNetworkInterfacePermission'
+              - 'ec2:Describe*'
+              - 'ec2:DetachNetworkInterface'
+
+              # Rules which allow ECS to update load balancers on your behalf
+              # with the information sabout how to send traffic to your containers
+              - 'elasticloadbalancing:DeregisterInstancesFromLoadBalancer'
+              - 'elasticloadbalancing:DeregisterTargets'
+              - 'elasticloadbalancing:Describe*'
+              - 'elasticloadbalancing:RegisterInstancesWithLoadBalancer'
+              - 'elasticloadbalancing:RegisterTargets'
+
+              # Rules which allow ECS to run tasks that have IAM roles assigned to them.
+              - 'iam:PassRole'
+
+              # Rules that let ECS interact with container images.
+              - 'ecr:GetAuthorizationToken'
+              - 'ecr:BatchCheckLayerAvailability'
+              - 'ecr:GetDownloadUrlForLayer'
+              - 'ecr:BatchGetImage'
+
+              # Rules that let ECS create and push logs to CloudWatch.
+              - 'logs:DescribeLogStreams'
+              - 'logs:CreateLogStream'
+              - 'logs:CreateLogGroup'
+              - 'logs:PutLogEvents'
+
+            Resource: '*'
+
+  ECSTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+              - ecs-tasks.amazonaws.com
+          Action: ['sts:AssumeRole']
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
+      Path: /
+      Policies:
+        - PolicyName: AmazonECSTaskRolePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                - secretsmanager:GetSecretValue
+                - secretsmanager:DeleteSecret
+                Resource: "*"
+              #  Resource:
+              #  - !Ref SecretsManagerQuestsApiToken
+              #  - !Join
+              #    - ''
+              #    - - 'arn:aws:secretsmanager:'
+              #      - !Ref AWS::Region
+              #      - ':'
+              #      - !Ref AWS::AccountId
+              #      - ':secret:gdQuests/*'
+              - Effect: Allow
+                Action:
+                - secretsmanager:ListSecrets
+                - ssm:GetParameter
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                - ssm:GetParameter
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  # Allow the ECS Tasks to download images from ECR
+                  - 'ecr:GetAuthorizationToken'
+                  - 'ecr:BatchCheckLayerAvailability'
+                  - 'ecr:GetDownloadUrlForLayer'
+                  - 'ecr:BatchGetImage'
+
+                  # Allow the ECS tasks to upload logs to CloudWatch
+                  - 'logs:CreateLogStream'
+                  - 'logs:CreateLogGroup'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+
+              - Effect: Allow
+                Action:
+                  # Allows the ECS tasks to interact with only the QDKTable
+                  # in DynamoDB
+                  - 'dynamodb:Scan'
+                  - 'dynamodb:Query'
+                  - 'dynamodb:UpdateItem'
+                  - 'dynamodb:GetItem'
+                  - 'dynamodb:DescribeTable'
+                  - 'dynamodb:PutItem'
+                  - 'dynamodb:DeleteItem'
+                  - 'dynamodb:BatchWriteItem'
+                Resource: '*'
+                #  - !GetAtt DynamoDbOutputsTable.Arn
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DeleteStackInstances
+                  - cloudformation:ListStackInstances
+                  - cloudformation:DeleteStackSet
+                  - cloudformation:DescribeStackSetOperation
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                  - codepipeline:StartPipelineExecution
+                  - sts:assumeRole
+                Resource: "*"
+        - PolicyName: SecretsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+              - secretsmanager:GetSecretValue
+              - secretsmanager:DeleteSecret
+              Resource:
+              - !Ref SecretsManagerQuestsApiToken
+              - !Join
+                - ''
+                - - 'arn:aws:secretsmanager:'
+                  - !Ref AWS::Region
+                  - ':'
+                  - !Ref AWS::AccountId
+                  - ':secret:gdQuests/*'
+            - Effect: Allow
+              Action:
+              - secretsmanager:ListSecrets
+              - ssm:GetParameter
+              Resource: "*"
+        - PolicyName: ParametersPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+              - ssm:GetParameter
+              Resource: "*"
+  QDKProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref ECSTaskRole
+
+  EventRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Sub ${AWS::StackName}-events-service
+      RepositoryDescription:  This is the Event QDK repository in CodeCommit
+      Code:
+        S3:
+          Bucket: !Join
+          - ''
+          - - !Ref gdQuestsEEAssetsBucketPrefix
+            - !Ref AWS::Region
+          Key: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, events-service.zip ] ]
+
+  InteractionsRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Sub ${AWS::StackName}-interactions-service
+      RepositoryDescription:  This is the QDK repository in CodeCommit
+      Code:
+        S3:
+          Bucket: !Join
+          - ''
+          - - !Ref gdQuestsEEAssetsBucketPrefix
+            - !Ref AWS::Region
+          Key: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, interactions-service.zip ] ]
+
+  ScoringRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Sub ${AWS::StackName}-scoring-service
+      RepositoryDescription:  This is the QDK repository in CodeCommit
+      Code:
+        S3:
+          Bucket: !Join
+          - ''
+          - - !Ref gdQuestsEEAssetsBucketPrefix
+            - !Ref AWS::Region
+          Key: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, scoring-service.zip ] ]
+
+  CronRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Sub ${AWS::StackName}-cron-service
+      RepositoryDescription:  This is the QDK repository in CodeCommit
+      Code:
+        S3:
+          Bucket: !Join
+          - ''
+          - - !Ref gdQuestsEEAssetsBucketPrefix
+            - !Ref AWS::Region
+          Key: !Join [ '', [ !Ref gdQuestsEEAssetsKeyPrefix, cron-service.zip ] ]
+
+  # Actual CodeBuild project that builds the Docker images and outputs imagedefinitions.json
+  InteractionsDockerBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: "CODEPIPELINE"
+      Source:
+        Type: "CODEPIPELINE"
+        BuildSpec: "buildspec_prod.yml"
+      Environment:
+        PrivilegedMode: true
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/standard:5.0"
+        Type: "LINUX_CONTAINER"
+        EnvironmentVariables:
+        - Name: AWS_ACCOUNT_ID
+          Value: !Ref AWS::AccountId
+          Type: PLAINTEXT
+        - Name: REPOSITORY_URI
+        # Interactions ECR
+          Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Interactions}
+          Type: PLAINTEXT
+      Name: !Sub ${AWS::StackName}-interactions-service-build
+      ServiceRole: !Ref CodePipelineServiceRole
+
+  EventDockerBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: "CODEPIPELINE"
+      Source:
+        Type: "CODEPIPELINE"
+        BuildSpec: "buildspec_prod.yml"
+      Environment:
+        PrivilegedMode: true
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/standard:5.0"
+        Type: "LINUX_CONTAINER"
+        EnvironmentVariables:
+        - Name: AWS_ACCOUNT_ID
+          Value: !Ref AWS::AccountId
+          Type: PLAINTEXT
+        - Name: REPOSITORY_URI
+        # Interactions ECR
+          Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Event}
+          Type: PLAINTEXT
+      Name: !Sub ${AWS::StackName}-events-service-build
+      ServiceRole: !Ref CodePipelineServiceRole
+
+  ScoringDockerBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: "CODEPIPELINE"
+      Source:
+        Type: "CODEPIPELINE"
+        BuildSpec: "buildspec_prod.yml"
+      Environment:
+        PrivilegedMode: true
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/standard:5.0"
+        Type: "LINUX_CONTAINER"
+        EnvironmentVariables:
+        - Name: AWS_ACCOUNT_ID
+          Value: !Ref AWS::AccountId
+          Type: PLAINTEXT
+        - Name: REPOSITORY_URI
+        # Scoring ECR
+          Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Scoring}
+          Type: PLAINTEXT
+      Name: !Sub ${AWS::StackName}-scoring-service-build
+      ServiceRole: !Ref CodePipelineServiceRole
+
+  CronDockerBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: "CODEPIPELINE"
+      Source:
+        Type: "CODEPIPELINE"
+        BuildSpec: "buildspec_prod.yml"
+      Environment:
+        PrivilegedMode: true
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/standard:5.0"
+        Type: "LINUX_CONTAINER"
+        EnvironmentVariables:
+        - Name: AWS_ACCOUNT_ID
+          Value: !Ref AWS::AccountId
+          Type: PLAINTEXT
+        - Name: REPOSITORY_URI
+        # Cron ECR
+          Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Cron}
+          Type: PLAINTEXT
+      Name: !Sub ${AWS::StackName}-cron-service-build
+      ServiceRole: !Ref CodePipelineServiceRole
+
+  # CodePipeline for deployments. Uses CodeCommit + CodeBuild + ECS, deploying
+  # to an existing ECS service. It looks for imagedefinitions.json as well as
+  # buildspec_prod for this
+  InteractionsServicePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !Ref QDKArtifactBucket
+      Name: !Sub Interactions-Pipeline-${AWS::StackName}
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      Stages:
+        - Name: 'Source'
+          Actions:
+            - Name: 'Source'
+              ActionTypeId:
+                Category: 'Source'
+                Owner: 'AWS'
+                Version: '1'
+                Provider: CodeCommit
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                BranchName: main
+                RepositoryName: !GetAtt InteractionsRepo.Name
+              RunOrder: 1
+        - Name: 'Build_Docker_Container'
+          Actions:
+            - Name: CodeBuild
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ProjectName: !Ref InteractionsDockerBuildProject
+              RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - Name: Deploy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: ECS
+              InputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ClusterName: !Ref QDKEcsCluster
+                ServiceName: !Sub ${AWS::StackName}_QDK-Interactions-Service
+                FileName: imagedefinitions.json
+              RunOrder: 1
+    DependsOn: QDKListener
+
+  EventServicePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !Ref QDKArtifactBucket
+      Name: !Sub Event-Pipeline-${AWS::StackName}
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      Stages:
+        - Name: 'Source'
+          Actions:
+            - Name: 'Source'
+              ActionTypeId:
+                Category: 'Source'
+                Owner: 'AWS'
+                Version: '1'
+                Provider: CodeCommit
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                BranchName: main
+                RepositoryName: !GetAtt EventRepo.Name
+              RunOrder: 1
+        - Name: 'Build_Docker_Container'
+          Actions:
+            - Name: CodeBuild
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ProjectName: !Ref EventDockerBuildProject
+              RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - Name: Deploy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: ECS
+              InputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ClusterName: !Ref QDKEcsCluster
+                ServiceName: !Sub ${AWS::StackName}_QDK-Event-Service
+                FileName: imagedefinitions.json
+              RunOrder: 1
+        - Name: Invoke 
+          Actions:
+            - Name: InvokeLoadQuestData 
+              ActionTypeId:
+                Category: Invoke 
+                Owner: AWS
+                Version: 1
+                Provider: Lambda 
+              Configuration:
+                FunctionName: !Ref LambdaLoadQuestsData
+              RunOrder: 1
+    DependsOn: QDKListener
+
+  ScoringServicePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !Ref QDKArtifactBucket
+      Name: !Sub Scoring-Pipeline-${AWS::StackName}
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      Stages:
+        - Name: 'Source'
+          Actions:
+            - Name: 'Source'
+              ActionTypeId:
+                Category: 'Source'
+                Owner: 'AWS'
+                Version: '1'
+                Provider: CodeCommit
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                BranchName: main
+                RepositoryName: !GetAtt ScoringRepo.Name
+              RunOrder: 1
+        - Name: 'Build_Docker_Container'
+          Actions:
+            - Name: CodeBuild
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ProjectName: !Ref ScoringDockerBuildProject
+              RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - Name: Deploy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: ECS
+              InputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ClusterName: !Ref QDKEcsCluster
+                ServiceName: !Sub ${AWS::StackName}_QDK-Scoring-Service
+                FileName: imagedefinitions.json
+              RunOrder: 1
+    DependsOn: QDKListener
+
+  CronServicePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !Ref QDKArtifactBucket
+      Name: !Sub Cron-Pipeline-${AWS::StackName}
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      Stages:
+        - Name: 'Source'
+          Actions:
+            - Name: 'Source'
+              ActionTypeId:
+                Category: 'Source'
+                Owner: 'AWS'
+                Version: '1'
+                Provider: CodeCommit
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                BranchName: main
+                RepositoryName: !GetAtt CronRepo.Name
+              RunOrder: 1
+        - Name: 'Build_Docker_Container'
+          Actions:
+            - Name: CodeBuild
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ProjectName: !Ref CronDockerBuildProject
+              RunOrder: 1
+        - Name: Deploy
+          Actions:
+            - Name: Deploy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: ECS
+              InputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ClusterName: !Ref QDKEcsCluster
+                ServiceName: !Sub ${AWS::StackName}_QDK-Cron-Service
+                FileName: imagedefinitions.json
+              RunOrder: 1
+    DependsOn: QDKListener
+
+  SSMParameterQDKAPIEndpoint:
+    Type: AWS::SSM::Parameter
+    DependsOn: 
+      - QDKHTTPApiDeployment
+    Properties:
+      Name: qdk-api-baseurl
+      Type: String
+      Value: !Join
+      - ''
+      - - "https://"
+        - !Ref QDKHTTPApi
+        - ".execute-api."
+        - !Ref AWS::Region
+        - ".amazonaws.com"
+
+  QDKHTTPApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: QDKHTTPApi
+      Description: QDK HTTP API Gateway
+      ProtocolType: HTTP
+
+  QDKApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      StageName: $default
+      ApiId: !Ref QDKHTTPApi
+      AutoDeploy: True
+
+  QDKHTTPApiDeployment: 
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+      - HTTPApiRoute
+      - HTTPVpcLink
+      - ApiVpcLinkIntegration
+    Properties:
+      ApiId: !Ref QDKHTTPApi
+
+  HTTPApiRoute:
+    DependsOn:
+      - QDKHTTPApi
+      - HTTPVpcLink
+    Type: 'AWS::ApiGatewayV2::Route'
+    Properties:
+      ApiId: !Ref QDKHTTPApi
+      RouteKey: 'ANY /{proxy+}'
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref ApiVpcLinkIntegration 
+
+  HTTPVpcLink:
+    Type: AWS::ApiGatewayV2::VpcLink
+    Properties:
+      Name: HttpVpcLink 
+      SecurityGroupIds:
+        - !Ref VPCLinkSecurityGroup
+      SubnetIds:
+        - !Ref PrivateSubnetOne
+        - !Ref PrivateSubnetTwo
+  
+  ApiVpcLinkIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    DependsOn:
+      - QDKListener
+    Properties:
+      Description: Integrates VPC link to QDK Load Balancer
+      ApiId: !Ref QDKHTTPApi
+      ConnectionId: !Ref HTTPVpcLink
+      ConnectionType: VPC_LINK
+      IntegrationType: HTTP_PROXY
+      IntegrationUri: !Ref QDKListener
+      IntegrationMethod: ANY
+      PayloadFormatVersion: 1.0
+      TimeoutInMillis: 30000
+
+Outputs:
+  EventUIURL:
+    Description: The URL used to access the AWS GameDay Quests Event UI
+    Value: !Join [ '', [ 'https://', !GetAtt CloudFrontDistribution.DomainName, '/' ]]
+  EventUIAuthDomain:
+    Description: Authentication domain used by the AWS GameDay Quests Event UI
+    Value: !Join [ '', [ !Ref CognitoUserPoolDomain, '.auth.', !Ref AWS::Region, '.amazoncognito.com' ] ]
+
+  EventUIGraphQLEndpoint:
+    Description: The GraphQL Endpoint used by the AWS GameDay Quests Event UI
+    Value: !GetAtt AppSyncAPI.GraphQLUrl
+
+  EventUIUserPoolID:
+    Description: The Cognito User Pool ID used by the AWS GameDay Quests Event UI
+    Value: !Ref CognitoUserPool
+
+  EventUIUserPoolClient:
+    Description: The Cognito User Pool Client IT used by the AWS GameDay Quests Event UI
+    Value: !Ref CognitoUserPoolClient
+
+  DynamoDbHintsTable:
+    Description: Export for hints table for cross-stack referencing
+    Value: !Ref DynamoDbHintsTable
+    Export:
+      Name: gdQuests-DynamoDbHintsTable
+
+  DynamoDbLockedResourcesTable:
+    Description: Export for locked resources table for cross-stack referencing
+    Value: !Ref DynamoDbLockedResourcesTable
+    Export:
+      Name: gdQuests-DynamoDbLockedResourcesTable
+
+  DynamoDbQuestsTable:
+    Description: Export for quests table for cross-stack referencing
+    Value: !Ref DynamoDbQuestsTable
+    Export:
+      Name: gdQuests-DynamoDbQuestsTable
+
+  DynamoDbQuestStatesTable:
+    Description: Export for quest states table for cross-stack referencing
+    Value: !Ref DynamoDbQuestStatesTable
+    Export:
+      Name: gdQuests-DynamoDbQuestStatesTable
+
+  QDKImageECRRepository:
+    Description: ECR Repository with the source code
+    Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${QDKImage}
+    Export:
+      Name: gdQuests-QDKImageECRRepository
+
+  PipelineCloudFormationRoleArn:
+    Description: IAM Role for CloudFormation executions
+    Value: !Join [ '', [ 'arn:aws:iam::', !Ref AWS::AccountId, ':role/gdQuests/', !Ref IamRoleCloudFormation ] ]
+    Export:
+      Name: gdQuests-PipelineCloudFormationRoleArn
+
+  KMSKey:
+    Description: Export for quest states table for cross-stack referencing
+    Value: !Ref s3Key
+    Export:
+      Name: gdQuests-s3Key
+
+  KMSKeyArn:
+    Description: Export for quest states table for cross-stack referencing
+    Value: !GetAtt s3Key.Arn
+    Export:
+      Name: gdQuests-s3Key-Arn

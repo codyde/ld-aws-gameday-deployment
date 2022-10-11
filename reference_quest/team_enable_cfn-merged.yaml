@@ -1,0 +1,488 @@
+# Copyright 2022 Amazon.com and its affiliates; all rights reserved. 
+# This file is Amazon Web Services Content and may not be duplicated or distributed without permission.
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Reference Quest
+
+Parameters:
+  # These parameters are supplied by the Quests API when this template is deployed 
+  DeployAssetsBucket:
+    # Default: ee-assets-prod-us-east-1
+    Description: The name of the S3 bucket where assets are stored
+    Type: String
+  DeployAssetsKeyPrefix:
+    # Default: modules/9c0e89820b864addaed45ec2f5440379/v5/
+    Description: S3 key prefix where assets are stored
+    Type: String
+  # Additional parameters required by this template
+  QuestId:
+    Default: 2ae514a9-a6dc-4fc0-a797-3f4a7bbd1d63
+    Description: The ID assigned to this quest
+    Type: String
+  TeamLambdaSourceKey:
+    Default: gdQuests-team-lambda-source.zip
+    Description: S3 key for the Lambda source code used by the team account for the Quest
+    Type: String
+  StaticAssetsBucket:
+    Type: String
+    Description: (Optional) Bucket for static assets that live outside of the pipeline (e.g. data for seeding)
+    Default: ''
+  StaticAssetsKeyPrefix:
+    Type: String
+    Description: (Optional) Bucket prefix for static assets that live outside of the pipeline (e.g. data for seeding)
+    Default: ''
+  TeamWorkerSourceKey:
+    Default: Archive.zip
+    Description: S3 key for the dummy zip file containing the buildspec_prod.yml and dockerfile
+    Type: String
+  LaunchDarklyClientKey:
+    Default: '633b74a2fe345710e2d19def'
+    Description: Client SDK Key for LaunchDarkly configuration
+    Type: String
+  LaunchDarklyServerKey:
+    Default: 'sdk-64c0dc04-2f47-4843-a0dd-05ca5bd5b849'
+    Description: Server SDK Key for LaunchDarkly configuration
+    Type: String
+  TeamName:
+    Default: '1'
+    Description: AWS Gameday Table Number
+    Type: String
+  
+
+
+# Mappings:
+#   AWSRegionAMI:
+#     us-east-1:
+#       HVM64: ami-090fa75af13c156b4
+#     us-east-2:
+#       HVM64: ami-051dfed8f67f095f5   
+#     us-west-1:
+#       HVM64: ami-0e4d9ed95865f3b40
+#     us-west-2:
+#       HVM64: ami-0cea098ed2ac54925
+#     eu-west-1:
+#       HVM64: ami-089950bc622d39ed8
+#     eu-west-2:
+#       HVM64: ami-0e34bbddc66def5ac
+#     eu-central-1:
+#       HVM64: ami-0c956e207f9d113d5
+
+
+Resources: 
+  # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+  # ║ AWS GameDay Quests - Team Enable Resources                                                                                                               ║
+  # ╠═══════════════════════╤═════════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════════════╣
+  # ║ LambdaRole            │ AWS::IAM::Role              │ Execution role for the resource lookup Lambda                                                      ║
+  # ║ ResourceLookupLambda  │ AWS::Lambda::Function       │ Lambda Function that looks up default resources in the account                                     ║
+  # ║ ResourceLookup        │ Custom::ResourceLookup      │ Custom provisioning logic invoking the Resource Lookup                                             ║
+  # ║ WebAppOnEC2           │ AWS::EC2::Instance          │ An EC2 instance that runs a simple Apache Web App                                                  ║
+  # ║ PublicSecurityGroup   │ AWS::EC2::SecurityGroup     │ The security group added to WebAppOnEC2                                                            ║
+  # ║ DeveloperUser         │ AWS::IAM::User              │ The IAM user pretended to be compromised                                                           ║
+  # ║ AccessKeys            │ AWS::IAM::AccessKey         │ The "compromised" access key for DeveloperUser                                                     ║
+  # ╚═══════════════════════╧═════════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+  LambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Description: Provides permissions for internally-invoked Lambda resources
+      Policies:
+      - PolicyName: CloudWatchLogsPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            - logs:DescribeLogStreams
+            Resource: "*"
+      - PolicyName: dynamodbAccessRole
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - dynamodb:*
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - logs:*
+            Resource: "*"
+      
+  ResourceLookupLambda:
+    Type: AWS::Lambda::Function
+    Description: Lookup resources
+    Properties:
+      Handler: "resource_lookup.lambda_handler"
+      Runtime: python3.9
+      Timeout: '30'
+      Code:
+        S3Bucket: !Ref DeployAssetsBucket
+        S3Key: !Join
+          - ''
+          - - !Ref DeployAssetsKeyPrefix
+            - !Ref TeamLambdaSourceKey
+      Role: !GetAtt LambdaRole.Arn
+
+  ResourceLookup:
+    Type: Custom::ResourceLookup
+    Properties:
+      ServiceToken: !GetAtt ResourceLookupLambda.Arn
+
+  DeveloperUser:
+    Type: 'AWS::IAM::User'
+    Properties:
+        UserName: ReferenceDeveloper
+        ManagedPolicyArns:
+           - 'arn:aws:iam::aws:policy/AdministratorAccess'
+
+  InitFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3 
+          import os
+          import cfnresponse
+
+          dynamodb = boto3.resource('dynamodb')
+          table = dynamodb.Table('GamedayDB')
+
+          def handler(event, context):
+            data = table.put_item(
+            TableName='GamedayDB',
+            Item={
+                'teamid': '1',
+                'debugcode': 'pants',
+                'teamval': '123-abc'
+                }
+            )
+            data2 = table.put_item(
+            TableName='GamedayDB',
+            Item={
+                'teamid': '2',
+                'title1':'Unicorn with Confidence',
+                'text1':'Because you can always be confident when Unicorn.Rentals is providing your Unicorn.',
+                'title2':'Mythically Reliabile',
+                'text2':"If you can't trust that your Unicorn is going to be available when you ask for it, what can you really trust in this world?",
+                'title3':'Automagic Unicornation',
+                'text3':'The Unicorn is neither missing nor present. Its Automagic. It arrives when it needs to be there, and not a second before.',
+                }
+            )
+
+            response = {
+              'statusCode': 200,
+              'body': 'successfully created items!',
+              'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+              },
+            }
+            cfnresponse.send(event, context, cfnresponse.SUCCESS, response) 
+      Environment:
+        Variables:
+          id: !Ref TeamName
+      Handler: index.handler
+      Role:
+        Fn::GetAtt: [ LambdaRole , "Arn" ]
+      Runtime: python3.9
+      Timeout: 60
+    DependsOn: GamedayDB
+
+  GamedayDB:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: GamedayDB
+      AttributeDefinitions:
+        - AttributeName: teamid
+          AttributeType: S
+      KeySchema:
+        - AttributeName: teamid
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+    DependsOn: PipelineCloudWatchEventRole
+
+  # CodeBuild needs a place to put artifacts in the interim.
+  CodePipelineArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+
+  MyAppImage:
+    Type: AWS::ECR::Repository
+
+  MyAppRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: my-app-repo-ld
+      RepositoryDescription:  This is the repository in CodeCommit
+      Code:
+        S3:
+          Bucket: !Ref StaticAssetsBucket
+          Key: !Join
+          - ''
+          # - - !Ref StaticAssetsKeyPrefix
+          - - !Ref TeamWorkerSourceKey
+
+  DockerBuildCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: "CODEPIPELINE"
+      Source:
+        Type: "CODEPIPELINE"
+        BuildSpec: "buildspec_prod.yml"
+      Environment:
+        PrivilegedMode: true
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/standard:5.0"
+        Type: "LINUX_CONTAINER"
+        EnvironmentVariables:
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+            Type: PLAINTEXT
+          - Name: REPOSITORY_URI
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${MyAppImage}
+            Type: PLAINTEXT
+          - Name: NEXT_PUBLIC_LD_CLIENT_KEY
+            Value: !Ref LaunchDarklyClientKey
+            Type: PLAINTEXT
+          - Name: LD_SERVER_KEY
+            Value: !Ref LaunchDarklyServerKey
+            Type: PLAINTEXT
+          - Name: NEXT_PUBLIC_TEAM_ID
+            Value: !Ref TeamName
+            Type: PLAINTEXT
+      Name: !Sub ${AWS::StackName}-image-build
+      ServiceRole: !Ref CodePipelineServiceRole
+
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ['tasks.apprunner.amazonaws.com']
+            Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: ddb-access
+          PolicyDocument:
+            Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:BatchGetItem
+                - dynamodb:Scan
+                - dynamodb:Query
+                - dynamodb:ConditionCheckItem
+              Resource:
+                - !GetAtt GamedayDB.Arn
+  
+  # AppRunnerCanaryService:
+  #   Type: AWS::AppRunner::Service
+  #   Properties:
+  #     SourceConfiguration:
+  #       AuthenticationConfiguration:
+  #           AccessRoleArn: !Sub arn:aws:iam::${AWS::AccountId}:role/service-role/AppRunnerECRAccessRole
+  #       ImageRepository:
+  #         ImageRepositoryType: "ECR"
+  #         ImageIdentifier: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${MyAppImage}:latest
+  #         ImageConfiguration:
+  #           Port: "5000"
+  #           RuntimeEnvironmentVariables:
+  #             -
+  #               Name: LD_SERVER_KEY
+  #               Value: !Ref LaunchDarklyServerKey
+  #             - Name: NEXT_PUBLIC_TEAM_ID
+  #               Value: !Ref TeamName
+  #       AutoDeploymentsEnabled: false
+  #     HealthCheckConfiguration:
+  #       Protocol: "TCP"
+  #       Interval: "2"
+  #       Path: '/'
+  #       Timeout: "5"
+  #       HealthyThreshold: "1"
+  #       UnhealthyThreshold: "5"
+  #     InstanceConfiguration:
+  #       Cpu: "1024"
+  #       Memory: "2048"
+  #   DependsOn: WaitCondition
+
+
+  MyAppPipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !Ref CodePipelineArtifactBucket
+      Name: !Sub ${AWS::StackName}
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      Stages:
+        - Name: 'Source'
+          Actions:
+            - Name: 'Source'
+              ActionTypeId:
+                Category: 'Source'
+                Owner: 'AWS'
+                Version: '1'
+                Provider: CodeCommit
+              OutputArtifacts:
+                - Name: SourceArtifact
+              Configuration:
+                BranchName: main
+                RepositoryName: my-app-repo-ld
+              RunOrder: 1
+        - Name: 'Build_Docker_Container'
+          Actions:
+            - Name: CodeBuild
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: SourceArtifact
+              OutputArtifacts:
+                - Name: BuildArtifact
+              Configuration:
+                ProjectName: !Ref DockerBuildCodeBuildProject
+              RunOrder: 1
+
+  # CodePipeline does not automatically create this for you as part of
+  # creation, but this role is for the CWE Hook to trigger CodePipeline once
+  # there's an update in CodeCommit. Otherwise, we have to have CodePipeline
+  # poll for changes, which is slower.
+  PipelineCloudWatchEventRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: cwe-pipeline-execution
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: codepipeline:StartPipelineExecution
+                Resource: !Sub arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${MyAppPipeline}
+
+  # This role is used by CodePipeline to trigger deployments
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "codepipeline.amazonaws.com"
+                - "cloudformation.amazonaws.com"
+                - "codedeploy.amazonaws.com"
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:GetBucketVersioning
+              - Resource: "arn:aws:s3:::*"
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - codecommit:*
+                  - codebuild:StartBuild
+                  - codebuild:BatchGetBuilds
+                  - iam:PassRole
+                  - iam:CreateRole
+                  - iam:DetachRolePolicy
+                  - iam:AttachRolePolicy
+                  - iam:PassRole
+                  - iam:PutRolePolicy
+                  - cloudwatch:*
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - ecs:*
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - ecr:GetAuthorizationToken
+              - Resource: !Sub arn:aws:s3:::${CodePipelineArtifactBucket}/*
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:GetObjectVersion
+              - Resource:
+                  - !Sub arn:aws:s3:::codepipeline-${AWS::Region}-*
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+              - Effect: Allow
+                Action:
+                  - ecr:*
+                Resource:
+                  - !GetAtt MyAppImage.Arn
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: "*"
+
+Outputs:
+  QuestsResourceLocks:
+    Description: A JSON object that defines what IAM actions to restrict as a result of deploying this template
+    Value: !Sub |-
+      [
+        {
+          "Actions": [
+            "lambda:DeleteFunction",
+            "lambda:GetFunction",
+            "lambda:InvokeFunction",
+            "lambda:PublishVersion",
+            "lambda:RemovePermission",
+            "lambda:UpdateFunctionCode",
+            "lambda:UpdateFunctionConfiguration",
+            "lambda:UpdateFunctionUrlConfig",
+            "lambda:UpdateFunctionEventInvokeConfig"
+          ],
+          "Resources": [
+            "${ResourceLookupLambda.Arn}"
+          ]
+        }
+      ]

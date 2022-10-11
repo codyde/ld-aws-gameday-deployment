@@ -1,0 +1,22 @@
+[
+    {
+        "quest-id": "2ae514a9-a6dc-4fc0-a797-3f4a7bbd1d63",
+        "quest-enabled": false,
+        "quest-central-status": "DISABLED",
+        "quest-name": "Reference Quest",
+        "quest-description": "A developer reference quest to get acclimated with the AWS GameDay Quest Development Kit (QDK)",
+        "quest-difficulty": 1,
+        "quest-use-case": "[\"Getting Started\", \"Example Quest\"]",
+        "quest-services": "[\"AWS CloudShell\", \"AWS Systems Manager\", \"AWS IAM\", \"AWS STS\", \"Amazon EC2\"]",
+        "quest-duration": "30",
+        "quest-duration-total": 0,
+        "quest-samples": 0,
+        "quest-dependencies": "",
+        "quest-central-cfn": "central_cfn.yaml",
+        "quest-team-cfn-enable": "team_enable_cfn.yaml",
+        "quest-team-cfn-activate": "",
+        "quest-hints-file": "",
+        "quest-readme": "readme.md",
+        "quest-base-points": 0
+    }
+]

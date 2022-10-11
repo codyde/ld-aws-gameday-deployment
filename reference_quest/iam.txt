@@ -1,0 +1,46 @@
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# This file is for documentation purpose only, as it lists the permissions required by your quest.                    #
+# The information in it will not be automatically processed. Later on, an AWS GameDay system administrator will copy  #
+# them over to production artifacts. Modify this file appropriately as per your quest's requirements and make sure to #
+# abide by the principle of least privilege. Note that as a GameDay event includes several other components, among    #
+# which other quests, participants will have permissions far beyond the ones documented in here.                      #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+╔══════════════════════════╤═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║ IAM Policy Statements    │ An array of IAM policy statements (not a full policy document) that will be applied to the TeamRole in an active Event. Make sure ║
+║                          │ this is a valid JSON array.                                                                                                       ║
+╚══════════════════════════╧═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+[
+  {
+    "Sid": "ReferenceQuestPolicy",
+    "Resource": "*",
+    "Action": [
+      "cloudshell:*",
+      "ec2:*",
+      "iam:UpdateAccessKey",
+      "iam:List*",
+      "iam:Get*"
+    ],
+    "Effect": "Allow"
+  }
+]
+
+╔══════════════════════════╤═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║ IAM Managed Policy ARNs  │ A list of managed IAM policy ARNs to attach to the TeamRole in an active Event. One ARN per line.                                 ║
+║                          │ (e.g. arn:aws:iam::aws:policy/IAMReadOnlyAccess)                                                                                  ║
+╚══════════════════════════╧═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+
+
+╔══════════════════════════╤═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║ IAM Trusted Services     │ A list of AWS services that the TeamRole should trust. One service per line. (e.g. s3.amazonaws.com)                              ║
+╚══════════════════════════╧═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+
+
+╔══════════════════════════╤═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║ IAM Service Linked Roles │ A list of service linked roles that should be pre-created for an active Event. One service linked role name per line.             ║
+║                          │ (e.g. autoscaling.amazonaws.com)                                                                                                  ║
+╚══════════════════════════╧═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+
