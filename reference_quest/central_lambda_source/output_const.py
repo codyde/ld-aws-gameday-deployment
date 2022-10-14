@@ -15,13 +15,21 @@ WELCOME_MARKDOWN=True
 
 # TASK 1 - App Runner Deployment
 TASK1_KEY="task1"
-TASK1_LABEL="Unicorns in the Clouds! Deploying the new Unicorn.Rentals!"
+TASK1_LABEL="Task 1 - Unicorns in the Clouds! Deploying the new Unicorn.Rentals!"
 TASK1_VALUE="""
-The pipelines have ran and its time to deploy our new Unicorn.Rentals into AWS! Roll up your sleeves, crack your knuckles, and get the application UP. As the Cloud Administrator at Unicorn.Rentals, you'll need to deploy the image for the website to AWS App Runner. You'll need to ensure that you import the **LaunchDarkly Server SDK** key as an **environment variable (`LD_SDK_KEY`)** as well as your **Team ID (`TEAM_ID`)**. Ensure you're using the correct **App Runner Instance Role** during the deployment to allow connectivity to the rest of the Unicorn.Rentals cloud environments.
+The pipelines have ran and its time to deploy our new Unicorn.Rentals into AWS! Roll up your sleeves, crack your knuckles, and get the application UP. 
+
+As the Cloud Administrator at Unicorn.Rentals, you'll need to deploy the image for the website to AWS App Runner. As part of this exercise, ensure the following configurations are applied: 
+
+* Set the App Runner to `deploy automatically on new image`
+* Set the port for the App Runner application to `5000`
+* Create an environment variable during your App Runner deployment your **LaunchDarkly Server SDK** key named `LD_SDK_KEY`. **Note:** You will find the value in the LaunchDarkly console
+* Create an environment variable for your **Team ID** named `TEAM_ID`
+* On the security tab, ensure you have selected an **INSTANCE ROLE** to allow connectivity to the necessary Unicorn.Rentals cloud resources 
 
 When your deployment is complete and running successfully, enter the full URL (including https://) below and the system will validate if the application is up! 
 
-**Note: From the time your submit your first check, you're on the clock! You'll lose points each time you submit an incorrect answer, and points every minute the correct URL isn't entered.**
+**Note: Incorrect submissions will cost you! Ensure the website is fully up before you submit, or you'll lose reputation along with score!**
 """
 TASK1_INDEX=10
 TASK1_MARKDOWN=True
@@ -31,14 +39,8 @@ TASK1_APPRUNNER_WRONG_LABEL="Well - there's nothing here"
 TASK1_APPRUNNER_WRONG_VALUE="""
 Uh oh! The URL you entered isn't returning any data! Its possible the URL is wrong or App Runner isn't up yet. Sorry about the points loss! Head over to **App Runner** in your AWS account and give it another try.
 """ 
-TASK1_APPRUNNER_WRONG_INDEX=14
+TASK1_APPRUNNER_WRONG_INDEX=11
 TASK1_APPRUNNER_WRONG_MARKDOWN=True
-
-TASK1_APPRUNNER_CORRECT_KEY="task1_url_up"
-TASK1_APPRUNNER_CORRECT_LABEL="We've got ignition!"
-TASK1_APPRUNNER_CORRECT_VALUE="The URL checks out! Our new website has been deployed into App Runner **successfully**!"
-TASK1_APPRUNNER_CORRECT_INDEX=15
-TASK1_APPRUNNER_CORRECT_MARKDOWN=True
 
 TASK1_APPRUNNER_INPUT_REMOVED_KEY='task1_input_remove'
 TASK1_APPRUNNER_INPUT_REMOVED_LABEL="Input evaluating..."
@@ -47,42 +49,40 @@ TASK1_APPRUNNER_INPUT_REMOVED_INDEX=16
 TASK1_APPRUNNER_INPUT_REMOVED_MARKDOWN=True
 
 
-TASK1_APPRUNNER_DOWN_KEY="task1_webapp_down"
-TASK1_APPRUNNER_DOWN_LABEL="Something’s wrong!"
-TASK1_APPRUNNER_DOWN_VALUE="""
-App Runner may be up, but the webapp is still down and not reporting a healthy code. Time to debug! 
-"""
-TASK1_APPRUNNER_DOWN_INDEX=17
-TASK1_APPRUNNER_DOWN_MARKDOWN=True
-
 TASK1_COMPLETE_KEY="task1_complete"
-TASK1_COMPLETE_LABEL="All systems are green!"
+TASK1_COMPLETE_LABEL="Unicorn.Rentals is up and running!"
 TASK1_COMPLETE_VALUE="""
-The Unicorn.Rentals site on AWS App Runner is returning a 200 OK status code, indicating its up and running and ready to start releasing features in LaunchDarkly! You successfully launched our application into the cloud!
+Unicorn.Rentals has been launched successfully. You created an App Runner deployment of the new marketing website, and validated that it's up and returning a **200 OK** code, indicating its functional. You are one step closer to having the site live and serving user traffic! Now, it's time to start creating our feature flags and launching the **NEW** Unicorn.Rentals!
 """
-TASK1_COMPLETE_INDEX=19
+TASK1_COMPLETE_INDEX=13
 TASK1_COMPLETE_MARKDOWN=True
 
 
 # TASK 2 - Releasing
 TASK2_KEY="task2"
-TASK2_LABEL="Releasing the new Unicorn.Rentals!"
+TASK2_LABEL="Task 2 - Releasing the new Unicorn.Rentals!"
 TASK2_VALUE="""
-The pipelines have ran and the new Unicorn.Rentals code is deployed, but running stealth mode, gated behind feature flags to limit the users who can see the new changes. To get the new site launched, we'll need you to use LaunchDarkly to manage these feature flags. Navigate into your LaunchDarkly account, create the feature, and enable targeting for your users. Once rolled out, enter the version code from the bottom right of the application below to validate the page has launched! As a reminder, please work in the AWS region.
+The Unicorn.Rentals website is deployed, but currently running in stealth mode, hidden behind **[feature flags](https://launchdarkly.com/blog/what-are-feature-flags/)**. To get the new site launched, your team will need to create the feature flag in [LaunchDarkly](https://www.launchdarkly.com) and activate it for your users. Navigate into your LaunchDarkly account, create the feature flag listed below, and enable it. 
+
+##### Feature Flag Details to Create in LaunchDarkly
+* **Feature Flag Name** - `SiteRelease` 
+* **Flag Type** - Boolean
+
+Once enabled, the Unicorn.Rentals UI will update, and you'll be able to access a new API on the `/status` route, which you can use to validate that the correct version of Unicorn.Rentals has launched!
 """
 TASK2_INDEX=20
 TASK2_MARKDOWN=True
 
 TASK2_UNRELEASED_KEY="task2_app_unreleased"
-TASK2_UNRELEASED_LABEL="Still unreleased!"
+TASK2_UNRELEASED_LABEL="This status doesn't look very good..."
 TASK2_UNRELEASED_INDEX=21
-TASK2_UNRELEASED_VALUE="The preview version of the page is still running..."
-TASK2_UNRELEASED_VALUE=True
+TASK2_UNRELEASED_VALUE="The status code you entered is incorrect. Is the website actually released? Check your feature flag key and ensure it matches `SiteRelease` and try again!"
+TASK2_UNRELEASED_MARKDOWN=True
 
 TASK2_COMPLETE_KEY="task2_complete"
-TASK2_COMPLETE_LABEL="The new Unicorn.Rentals has been released!"
+TASK2_COMPLETE_LABEL="The new Unicorn.Rentals is **LIVE** for user traffic!"
 TASK2_COMPLETE_VALUE="""
-Amazing! You were able to launch the new website using LaunchDarkly! 
+Toggling the feature flag on for `SiteRelease` has enabled the new version of the Unicorn.Rentals website, however, something looks wrong. You can see debug messages reflected in the card views on the main page. Looks like the it's time to dig in and figure out what went wrong!
 """
 TASK2_COMPLETE_INDEX=29
 TASK2_COMPLETE_MARKDOWN=True
@@ -90,9 +90,9 @@ TASK2_COMPLETE_MARKDOWN=True
 
 # TASK 3 - Access Key
 TASK3_KEY="task3"
-TASK3_LABEL="Gone, but still here"
+TASK3_LABEL="Task 3 - Uh, we've got a problem here. This data looks off."
 TASK3_VALUE="""
-Our security team (one person in the basement) has discovered that one of our previous employees is still using old credentials to poke around inside our account. This is a serious matter. Every minute that passes increases the risk for malicious activity. You will lose points until this is resolved.
+Your team noticies significant amounts of debug data on the newly released Unicorn.Rentals site. You could quickly toggle off the feature flag to remove the problem website from view, but the team included a special feature flag in the code to assist with enabling the administrative debug menu. Your team will need to create a new feature flag in LaunchDarkly to enable this menu, but since we only want this menu displayed for specific users - we'll need to create a targeting rule to isolate access to only a specific individual.
 """
 TASK3_INDEX=30
 TASK3_MARKDOWN=True
@@ -109,9 +109,9 @@ TASK3_STARTED_MARKDOWN=True
 
 
 TASK3_COMPLETE_KEY="task3_complete"
-TASK3_COMPLETE_LABEL="Compromised access key: Passed!"
+TASK3_COMPLETE_LABEL="Success! You found the debug answer!"
 TASK3_COMPLETE_VALUE="""
-All done. Great job neutralizing the compromised access key.
+Upon enabling the debug menu you have found that the application is still connecting to its local debug data. In order to resolve the new data, we'll need to update the code for our application to enable the new connectivity feature flag. We'll need to update the code in our CodeCommit repository, allow our website image to rebuild, and AWS App Runner to automatically deploy the new version of our application. Let's get started! 
 """
 TASK3_COMPLETE_INDEX=39
 TASK3_COMPLETE_MARKDOWN=True

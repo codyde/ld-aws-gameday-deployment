@@ -13,7 +13,6 @@ Parameters:
     # Default: modules/9c0e89820b864addaed45ec2f5440379/v5/
     Description: S3 key prefix where assets are stored
     Type: String
-  # Additional parameters required by this template
   QuestId:
     Default: 2ae514a9-a6dc-4fc0-a797-3f4a7bbd1d63
     Description: The ID assigned to this quest
@@ -34,37 +33,26 @@ Parameters:
     Default: Archive.zip
     Description: S3 key for the dummy zip file containing the buildspec_prod.yml and dockerfile
     Type: String
+# TODO - Static value - should bring in from a central location during deployment
   LaunchDarklyClientKey:
     Default: '633b74a2fe345710e2d19def'
     Description: Client SDK Key for LaunchDarkly configuration
     Type: String
+# TODO - Static value - should bring in from a central location during deployment
   LaunchDarklyServerKey:
     Default: 'sdk-64c0dc04-2f47-4843-a0dd-05ca5bd5b849'
     Description: Server SDK Key for LaunchDarkly configuration
     Type: String
+# TODO - Static value - This should align to their table name - I use this to query a Dynamo table that will be created in the central account that will have various validation values 
   TeamName:
     Default: '1'
     Description: AWS Gameday Table Number
     Type: String
-  
-
-
-# Mappings:
-#   AWSRegionAMI:
-#     us-east-1:
-#       HVM64: ami-090fa75af13c156b4
-#     us-east-2:
-#       HVM64: ami-051dfed8f67f095f5   
-#     us-west-1:
-#       HVM64: ami-0e4d9ed95865f3b40
-#     us-west-2:
-#       HVM64: ami-0cea098ed2ac54925
-#     eu-west-1:
-#       HVM64: ami-089950bc622d39ed8
-#     eu-west-2:
-#       HVM64: ami-0e34bbddc66def5ac
-#     eu-central-1:
-#       HVM64: ami-0c956e207f9d113d5
+# TODO - Evaluate if this should be as static as it is - will this collide with other users? It won't if they have their own individual accounts
+  AppRepoName:
+    Default: 'app-gameday-ld'
+    Description: Gameday Repo Name
+    Type: String
 
 
 Resources: 
@@ -133,17 +121,17 @@ Resources:
             - !Ref TeamLambdaSourceKey
       Role: !GetAtt LambdaRole.Arn
 
-  ResourceLookup:
-    Type: Custom::ResourceLookup
-    Properties:
-      ServiceToken: !GetAtt ResourceLookupLambda.Arn
+  # ResourceLookup:
+  #   Type: Custom::ResourceLookup
+  #   Properties:
+  #     ServiceToken: !GetAtt ResourceLookupLambda.Arn
 
-  DeveloperUser:
-    Type: 'AWS::IAM::User'
-    Properties:
-        UserName: ReferenceDeveloper
-        ManagedPolicyArns:
-           - 'arn:aws:iam::aws:policy/AdministratorAccess'
+  # DeveloperUser:
+  #   Type: 'AWS::IAM::User'
+  #   Properties:
+  #       UserName: ReferenceDeveloper
+  #       ManagedPolicyArns:
+  #          - 'arn:aws:iam::aws:policy/AdministratorAccess'
 
   InitFunction:
     Type: AWS::Lambda::Function
@@ -163,13 +151,7 @@ Resources:
             Item={
                 'teamid': '1',
                 'debugcode': 'pants',
-                'teamval': '123-abc'
-                }
-            )
-            data2 = table.put_item(
-            TableName='GamedayDB',
-            Item={
-                'teamid': '2',
+                'teamval': '123-abc',
                 'title1':'Unicorn with Confidence',
                 'text1':'Because you can always be confident when Unicorn.Rentals is providing your Unicorn.',
                 'title2':'Mythically Reliabile',
@@ -198,6 +180,12 @@ Resources:
       Timeout: 60
     DependsOn: GamedayDB
 
+  PopulateData:
+    Type: Custom::CustomResource
+    Properties:
+      ServiceToken: !GetAtt InitFunction.Arn
+    DependsOn: GamedayDB
+
   GamedayDB:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -218,21 +206,120 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
 
+  CleanS3:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import json, boto3, logging
+          import cfnresponse
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def lambda_handler(event, context):
+              logger.info("event: {}".format(event))
+              try:
+                  bucket = event['ResourceProperties']['BucketName']
+                  logger.info("bucket: {}, event['RequestType']: {}".format(bucket,event['RequestType']))
+                  if event['RequestType'] == 'Delete':
+                      s3 = boto3.resource('s3')
+                      bucket = s3.Bucket(bucket)
+                      for obj in bucket.objects.filter():
+                          logger.info("delete obj: {}".format(obj))
+                          s3.Object(bucket.name, obj.key).delete()
+
+                  sendResponseCfn(event, context, cfnresponse.SUCCESS)
+              except Exception as e:
+                  logger.info("Exception: {}".format(e))
+                  sendResponseCfn(event, context, cfnresponse.FAILED)
+
+          def sendResponseCfn(event, context, responseStatus):
+              responseData = {}
+              responseData['Data'] = {}
+              cfnresponse.send(event, context, responseStatus, responseData, "CustomResourcePhysicalID") 
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt: [ LambdaRole , "Arn" ]
+      Runtime: python3.9
+      Timeout: 60
+
+  CleanECR:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import os
+          
+          account_id = os.environ['ACCOUNT_ID']
+          ecr_repository_name = os.environ['ECR_REPOSITORY_NAME']
+          
+          ecr_client = boto3.client('ecr')
+           
+          DELETE = 'Delete'
+          response_data = {}
+          
+          def lambda_handler(event, context):
+            try:
+              if event['RequestType'] == DELETE:
+                list_images_response = ecr_client.list_images(
+                  registryId=account_id,
+                  repositoryName=ecr_repository_name
+                  )
+                  
+                image_ids = list_images_response['imageIds']
+                
+                if len(image_ids) == 0:
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+                  return
+                
+                batch_delete_image_response = ecr_client.batch_delete_image(
+                  registryId=account_id,
+                  repositoryName=ecr_repository_name,
+                  imageIds=image_ids
+                  )
+                print(batch_delete_image_response)
+              
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+              
+            except Exception as e:
+              print(e)
+              cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
+      Environment:
+        Variables:
+          ACCOUNT_ID: !Ref AWS::AccountId
+          ECR_REPOSITORY_NAME: !Ref MyAppImage
+      Handler: index.lambda_handler
+      Runtime: python3.9
+      Role:
+        Fn::GetAtt: [ LambdaRole , "Arn" ]
+
+  CleanECROnDelete:
+    Type: Custom::CustomResource
+    Properties:
+      ServiceToken: !GetAtt CleanECR.Arn
+    DependsOn: MyAppImage
+
+  cleanupBucketOnDelete:
+    Type: Custom::cleanupbucket
+    Properties:
+      ServiceToken: !GetAtt CleanS3.Arn
+      BucketName: !Ref CodePipelineArtifactBucket
+    DependsOn: CodePipelineArtifactBucket
+
   MyAppImage:
     Type: AWS::ECR::Repository
 
   MyAppRepo:
     Type: AWS::CodeCommit::Repository
     Properties:
-      RepositoryName: my-app-repo-ld
+      RepositoryName: !Ref AppRepoName
       RepositoryDescription:  This is the repository in CodeCommit
       Code:
         S3:
           Bucket: !Ref StaticAssetsBucket
-          Key: !Join
-          - ''
-          # - - !Ref StaticAssetsKeyPrefix
-          - - !Ref TeamWorkerSourceKey
+          Key: !Ref TeamWorkerSourceKey
 
   DockerBuildCodeBuildProject:
     Type: AWS::CodeBuild::Project
@@ -276,7 +363,7 @@ Resources:
               Service: ['tasks.apprunner.amazonaws.com']
             Action: ['sts:AssumeRole']
       Path: /
-      Policies:
+      Policies: #Need to add lambda here
         - PolicyName: ddb-access
           PolicyDocument:
             Statement:
@@ -289,7 +376,20 @@ Resources:
                 - dynamodb:ConditionCheckItem
               Resource:
                 - !GetAtt GamedayDB.Arn
-  
+        - PolicyName: root
+          PolicyDocument:
+            Statement:
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:GetBucketVersioning
+              - Resource: "arn:aws:s3:::*"
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+
   # AppRunnerCanaryService:
   #   Type: AWS::AppRunner::Service
   #   Properties:
@@ -342,7 +442,7 @@ Resources:
                 - Name: SourceArtifact
               Configuration:
                 BranchName: main
-                RepositoryName: my-app-repo-ld
+                RepositoryName: !Ref AppRepoName
               RunOrder: 1
         - Name: 'Build_Docker_Container'
           Actions:
@@ -360,10 +460,6 @@ Resources:
                 ProjectName: !Ref DockerBuildCodeBuildProject
               RunOrder: 1
 
-  # CodePipeline does not automatically create this for you as part of
-  # creation, but this role is for the CWE Hook to trigger CodePipeline once
-  # there's an update in CodeCommit. Otherwise, we have to have CodePipeline
-  # poll for changes, which is slower.
   PipelineCloudWatchEventRole:
     Type: AWS::IAM::Role
     Properties:

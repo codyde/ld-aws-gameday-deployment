@@ -3,7 +3,7 @@
 
 # TASK 1 - App Runner Endpoint
 TASK1_ENDPOINT_KEY='task1_endpoint'
-TASK1_ENDPOINT_INDEX=11
+TASK1_ENDPOINT_INDEX=12
 TASK1_ENDPOINT_LABEL="What is the full URL for the AWS App Runner instance?"
 TASK1_ENDPOINT_DESCRIPTION="i.e. https://awsapprunnerurl.domain.com"
 
@@ -16,9 +16,10 @@ TASK2_LAUNCH_DESCRIPTION="i.e. v123"
 
 
 # TASK 3 - Database DebugID 
-TASK3_READY_KEY='task3_ready'
-TASK3_READY_INDEX=31
-TASK3_READY_LABEL="If you are ready to take up this challenge, type READY below and then click the Update button"
+TASK3_DEBUG_KEY='task3_ready'
+TASK3_DEBUG_INDEX=31
+TASK3_DEBUG_LABEL="Enter the debug code displayed in the UI from the hidden debug menu."
+TASK3_DEBUG_DESCRIPTION="text"
 
 
 # TASK 4 - Database Migrated

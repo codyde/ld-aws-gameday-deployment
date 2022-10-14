@@ -60,6 +60,23 @@ def getAppRelease(team_data):
         print(f"The version does not match")
         return False
 
+def getDebugValue(team_data):
+    try:
+        print(f"Getting debug value via the /teamdebug API")
+        conn = http.client.HTTPSConnection(team_data['app-runner-url'].strip('https://'), timeout=5)
+        conn.request("GET", "/teamdebug")
+        res = conn.getresponse()
+        string = res.read().decode('utf-8')
+        dataResp = json.loads(string)
+        print(dataResp['debugcode'])
+        if dataResp['debugcode'] == team_data['debugcode']:
+            return True
+        else:
+            raise Exception(f"The debug code is invalid")
+    except Exception as e:
+        print(f"The version does not match")
+        return False
+
 # This function is triggered by sns_lambda.py whenever the team has provided input via the event UI. It validates
 # the input and performs related operations, such as updating the team's DynamoDB table record or posting a feedback message.
 # Expected event parameters: {'team_id': team_id,'key': key, 'value': value}
@@ -204,128 +221,186 @@ def lambda_handler(event, context):
         except Exception as err:
             print(f"Error while handling team update request: {err}")
 
-        # else:
-        #     print("input value does NOT match event value")
-        #     # Post output
-        #     quests_api_client.post_output(
-        #         team_id=team_data['team-id'],
-        #         quest_id=QUEST_ID,
-        #         key=output_const.TASK1_APPRUNNER_WRONG_KEY,
-        #         label=output_const.TASK1_APPRUNNER_WRONG_LABEL,
-        #         value=output_const.TASK1_APPRUNNER_WRONG_VALUE,
-        #         dashboard_index=output_const.TASK1_APPRUNNER_WRONG_INDEX,
-        #         markdown=output_const.TASK1_APPRUNNER_WRONG_MARKDOWN,
-        #     )
-        #     # Detract points
-        #     quests_api_client.post_score_event(
-        #         team_id=team_data["team-id"],
-        #         quest_id=QUEST_ID,
-        #         description=scoring_const.WRONG_APPRUNNER_DESC,
-        #         points=scoring_const.WRONG_APPRUNNER_POINTS
-        #     )
-
     # Task 2 Website Release 
     if (event['key'] == input_const.TASK2_LAUNCH_KEY and not team_data['is-website-released']):
-        input_value = event['value']
-        print("The input value is "+input_value)
-        team_data['task2-attempted'] = True
-        team_data['app-version'] = input_value
-        released_version = getAppRelease(team_data)
-        print("The value is the app status is "+released_version)
-        dynamodb_utils.save_team_data(team_data, quest_team_status_table)
-        if released_version:
-            team_data['is-website-released'] = True
-            team_data['start-task-3'] = True
-            print("writing updated task2 value")
+        print("Removing input and locking the scoring")
+        quests_api_client.delete_input(
+            team_id=team_data["team-id"],
+            quest_id=QUEST_ID, 
+            key=input_const.TASK2_LAUNCH_KEY
+        )
+        task2_Score_Lock = team_data['task2-score-locked']
+        if not task2_Score_Lock:
+            team_data['task2-score-locked'] = True
+            input_value = event['value']
+            print("The input value is "+input_value)
+            team_data['task2-attempted'] = True
+            team_data['app-version'] = input_value
+            released_version = getAppRelease(team_data)
+            print("The value is the app status is "+str(released_version))
             dynamodb_utils.save_team_data(team_data, quest_team_status_table)
-
-            quests_api_client.delete_input(
-                team_id=team_data["team-id"],
-                quest_id=QUEST_ID, 
-                key=input_const.TASK2_LAUNCH_KEY
-            )
-
-            quests_api_client.post_output(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                key=output_const.TASK2_COMPLETE_KEY,
-                label=output_const.TASK2_COMPLETE_LABEL,
-                value=output_const.TASK2_COMPLETE_VALUE,
-                dashboard_index=output_const.TASK2_COMPLETE_INDEX,
-                markdown=output_const.TASK2_COMPLETE_MARKDOWN,
-            )
-
-            quests_api_client.post_score_event(
-                team_id=team_data["team-id"],
-                quest_id=QUEST_ID,
-                description=scoring_const.COMPLETE_DESC,
-                points=scoring_const.COMPLETE_POINTS
-            )
-        else: 
-            print("resetting app-version")
-            team_data['app-version'] = 'unknown'
-            print("writing values to Dynamo")
-            dynamodb_utils.save_team_data(team_data, quest_team_status_table)
-            quests_api_client.post_output(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                key=output_const.TASK2_UNRELEASED_KEY,
-                label=output_const.TASK2_UNRELEASED_LABEL,
-                value=output_const.TASK2_UNRELEASED_VALUE,
-                dashboard_index=output_const.TASK2_UNRELEASED_INDEX,
-                markdown=output_const.TASK2_UNRELEASED_MARKDOWN,
-            )
-
-            quests_api_client.post_score_event(
-                team_id=team_data["team-id"],
-                quest_id=QUEST_ID,
-                description=scoring_const.UNRELEASED_DESC,
-                points=scoring_const.UNRELEASED_POINTS
-            )
-
-
-
-    # Task 3 activation
-    elif event['key'] == input_const.TASK3_READY_KEY:
-
-        # Check team's input value
-        if event['value'].strip().lower() == "ready":
-
-            # Update flag as task started
-            team_data['credentials-task-started'] = True
-
-            try:
-                # First update DynamoDB to avoid race conditions, then do the rest on success
+            if released_version:
+                team_data['is-website-released'] = True
+                team_data['start-task-3'] = True
+                print("writing updated task2 value")
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
 
-                # Delete input since cannot be updated as task can be started only once
                 quests_api_client.delete_input(
                     team_id=team_data["team-id"],
                     quest_id=QUEST_ID, 
-                    key=input_const.TASK3_READY_KEY
+                    key=input_const.TASK2_LAUNCH_KEY
                 )
-                # Post output
+                
+                print("Task 2 - Checking for errors and deleting if there is")
+                
+                # Delete Score Lock Ouput here eventually key="task2_score_lock"
+                
+                quests_api_client.delete_output(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=output_const.TASK2_UNRELEASED_KEY,
+                )
+                
+                quests_api_client.delete_hint(
+                    team_id=team_data["team-id"],
+                    quest_id=QUEST_ID, 
+                    hint_key=hint_const.TASK2_HINT1_KEY,
+                    detail=True
+                )
+
                 quests_api_client.post_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
-                    key=output_const.TASK3_STARTED_KEY,
-                    label=output_const.TASK3_STARTED_LABEL,
-                    value=output_const.TASK3_STARTED_VALUE,
-                    dashboard_index=output_const.TASK3_STARTED_INDEX,
-                    markdown=output_const.TASK3_STARTED_MARKDOWN,
+                    key=output_const.TASK2_COMPLETE_KEY,
+                    label=output_const.TASK2_COMPLETE_LABEL,
+                    value=output_const.TASK2_COMPLETE_VALUE,
+                    dashboard_index=output_const.TASK2_COMPLETE_INDEX,
+                    markdown=output_const.TASK2_COMPLETE_MARKDOWN,
                 )
-                # Detract points
+
                 quests_api_client.post_score_event(
                     team_id=team_data["team-id"],
                     quest_id=QUEST_ID,
-                    description=scoring_const.KEY_NOT_ROTATED_DESC,
-                    points=scoring_const.KEY_NOT_ROTATED_POINTS
+                    description=scoring_const.COMPLETE_DESC,
+                    points=scoring_const.COMPLETE_POINTS
                 )
-            
-            except Exception as err:
-                print(f"Error while handling team update request: {err}")
+            else: 
+                print("resetting app-version")
+                team_data['app-version'] = 'unknown'
+                print("writing values to Dynamo")
+                dynamodb_utils.save_team_data(team_data, quest_team_status_table)
+                
+                quests_api_client.post_output(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key="task2_app_unreleased",
+                    label="Still unreleased!",
+                    value="The preview version of the page is still running",
+                    dashboard_index=21,
+                    markdown=True,
+                )
+                
+                # TASK2_UNRELEASED_KEY="task2_app_unreleased"
+                # TASK2_UNRELEASED_LABEL="Still unreleased!"
+                # TASK2_UNRELEASED_INDEX=21
+                # TASK2_UNRELEASED_VALUE="The preview version of the page is still running"
+                # TASK2_UNRELEASED_MARKDOWN=True
+
+                quests_api_client.post_score_event(
+                    team_id=team_data["team-id"],
+                    quest_id=QUEST_ID,
+                    description=scoring_const.UNRELEASED_DESC,
+                    points=scoring_const.UNRELEASED_POINTS
+                )
+                team_data['task2-score-locked'] = False
+                
+                print("Deleting task lock message")
+                quests_api_client.delete_output(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key="task2_score_lock",
+                )
+
+                quests_api_client.post_input(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=input_const.TASK2_LAUNCH_KEY,
+                    label=input_const.TASK2_LAUNCH_LABEL,
+                    description=input_const.TASK2_LAUNCH_DESCRIPTION,
+                    dashboard_index=input_const.TASK2_LAUNCH_INDEX
+                )
+                dynamodb_utils.save_team_data(team_data, quest_team_status_table)
         else:
-            print(f"Received the input '{event['value']}' from the team and not sure what to do with it")
+            quests_api_client.post_output(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key="task2_score_lock",
+                    label="Input Locked",
+                    value="It looks like a value has already been submitted - scoring is locked. Patience is a virtue",
+                    dashboard_index=14,
+                    markdown=True,
+                )
+
+    # Task 3 Debug Mode Enablement
+    elif event['key'] == input_const.TASK3_DEBUG_KEY and not team_data['is-debug-mode'] and not team_data['task3-score-locked']: # run if debug mode is false and task lock is off
+        try:
+            print("Removing input and locking the scoring")
+            quests_api_client.delete_input(
+                    team_id=team_data["team-id"],
+                    quest_id=QUEST_ID, 
+                    key=input_const.TASK3_DEBUG_KEY
+                )
+            team_data['task3-score-locked'] = True
+            dynamodb_utils.save_team_data(team_data, quest_team_status_table)
+            team_data['task3-attempted'] = True
+            input_value = event['value']
+            team_data['debugcode'] = input_value
+            debugstatus = getDebugValue(team_data)
+            if debugstatus:
+                quests_api_client.post_output(
+                        team_id=team_data['team-id'],
+                        quest_id=QUEST_ID,
+                        key=output_const.TASK3_COMPLETE_KEY,
+                        label=output_const.TASK3_COMPLETE_LABEL,
+                        value=output_const.TASK3_COMPLETE_VALUE,
+                        dashboard_index=output_const.TASK3_COMPLETE_INDEX,
+                        markdown=output_const.TASK3_COMPLETE_MARKDOWN,
+                    )
+
+                quests_api_client.post_score_event(
+                        team_id=team_data["team-id"],
+                        quest_id=QUEST_ID,
+                        description=scoring_const.DEBUG_RIGHT_DESC,
+                        points=scoring_const.DEBUG_RIGHT_POINTS
+                    )
+                team_data['is-debug-mode'] = True
+                dynamodb_utils.save_team_data(team_data, quest_team_status_table)
+            else:
+                print("Value was wrong - setting reset sequence") 
+                print("Removing score lock for Task 3")
+                team_data['task3-score-locked'] = False
+                team_data['debugCode'] = 'unknown'
+                quests_api_client.post_input(
+                        team_id=team_data['team-id'],
+                        quest_id=QUEST_ID,
+                        key=input_const.TASK3_DEBUG_KEY,
+                        label=input_const.TASK3_DEBUG_LABEL,
+                        description=input_const.TASK3_DEBUG_DESCRIPTION,
+                        dashboard_index=input_const.TASK3_DEBUG_INDEX
+                    )  
+
+                quests_api_client.post_score_event(
+                        team_id=team_data["team-id"],
+                        quest_id=QUEST_ID,
+                        description=scoring_const.DEBUG_WRONG_DESC,
+                        points=scoring_const.DEBUG_WRONG_POINTS
+                    )
+
+                dynamodb_utils.save_team_data(team_data, quest_team_status_table)
+
+        except Exception as err:
+            print(f"Error while handling team update request: {err}")
+
 
     # Task 4 evaluation
     elif event['key'] == input_const.TASK4_KEY:

@@ -30,6 +30,7 @@ Parameters:
     Type: String
     Description: (Optional) Bucket prefix for static assets that live outside of the pipeline (e.g. data for seeding)
     Default: ''
+  
 
 
 # Mappings:

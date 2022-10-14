@@ -60,7 +60,7 @@ def lambda_handler(event, context):
     team_data = evaluate_release(quests_api_client, team_data)
 
     # Task 3 evaluation
-    # team_data = evaluate_access_key(quests_api_client, team_data)
+    team_data = evaluate_debug_mode(quests_api_client, team_data)
 
     # Task 4 evaluation
     # team_data = evaluate_final_answer(quests_api_client, team_data)
@@ -77,7 +77,7 @@ def lambda_handler(event, context):
 
 # Task 1 evaluation - Monitoring
 def evaluate_apprunner(quests_api_client, team_data):
-    print(f"Evaluating monitoring task for team {team_data['team-id']}")
+    print(f"Evaluating app runn deployment task for team {team_data['team-id']}")
 
     # Check whether task was completed already
     if not team_data['is-webapp-up']:
@@ -172,7 +172,7 @@ def evaluate_apprunner(quests_api_client, team_data):
                     image_url = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}curl.jpeg",signed_duration=86400)
 
                     quests_api_client.post_output(
-                        team_id=team_data['team_id'],
+                        team_id=team_data['team-id'],
                         quest_id=QUEST_ID,
                         key=output_const.TASK2_KEY,
                         label=output_const.TASK2_LABEL,
@@ -335,6 +335,15 @@ def evaluate_release(quests_api_client, team_data):
                         hint_key=hint_const.TASK2_HINT1_KEY,
                         detail=True
                     )
+
+                    quests_api_client.delete_output(
+                        team_id=team_data['team-id'],
+                        quest_id=QUEST_ID,
+                        key="task2_score_lock",
+                    )
+
+                    # TODO BUILD A HINT HERE FOR THE DEBUG CODE SECTION - SOLVE THE
+                    
                 else:
                     print(f"The preview site is still displaying")
                     # quests_api_client.post_score_event(
@@ -355,6 +364,41 @@ def evaluate_release(quests_api_client, team_data):
                     # )
         else:
             print("Task not started yet - doing nothing")
+    else:
+
+        # Delete error and hint if they still exist 
+
+        quests_api_client.delete_output(
+            team_id=team_data['team-id'],
+            quest_id=QUEST_ID,
+            key=output_const.TASK2_UNRELEASED_KEY,
+        )
+        
+        quests_api_client.delete_hint(
+            team_id=team_data["team-id"],
+            quest_id=QUEST_ID, 
+            hint_key=hint_const.TASK2_HINT1_KEY,
+            detail=True
+        )
+
+        quests_api_client.post_output(
+            team_id=team_data['team-id'],
+            quest_id=QUEST_ID,
+            key=output_const.TASK2_COMPLETE_KEY,
+            label=output_const.TASK2_COMPLETE_LABEL,
+            value=output_const.TASK2_COMPLETE_VALUE,
+            dashboard_index=output_const.TASK2_COMPLETE_INDEX,
+            markdown=output_const.TASK2_COMPLETE_MARKDOWN,
+        )
+
+        quests_api_client.post_score_event(
+            team_id=team_data["team-id"],
+            quest_id=QUEST_ID,
+            description=scoring_const.COMPLETE_DESC,
+            points=scoring_const.COMPLETE_POINTS
+        )
+
+
     return team_data
 
 def getAppRelease(team_data):
@@ -373,73 +417,36 @@ def getAppRelease(team_data):
         return False
 
 
-# Task 3 - Access Key Rotation
-def evaluate_access_key(quests_api_client, team_data):
+# Task 3 - Debug Mode Enablement
+def evaluate_debug_mode(quests_api_client, team_data):
+    if ['start-task-3'] == True and not team_data['is-debug-mode'] and not team_data['task3-score-locked']:
+        print("Task 3 - Executing the start of debug mode module")
 
-    # Check whether the team has accepted the challenge and task has not been completed yet
-    if team_data['credentials-task-started'] and not team_data['is-accesskey-rotated']:
+        if team_data['debugcode'] == 'unknown':
 
-        # Establish cross-account session
-        print(f"Assuming Ops role for team {team_data['team-id']}")
-        xa_session = quests_api_client.assume_team_ops_role(team_data['team-id'])
-    
-        # Check user's access key
-        iam_client = xa_session.client('iam')
-        keys = iam_client.list_access_keys(UserName='ReferenceDeveloper')
-        status = "Not found"
-        for key in keys['AccessKeyMetadata']:
-            if (key['AccessKeyId'] == team_data['accesskey-value']):
-                status = key['Status']
-                print(f"Access key exists, checking if its active")
-                break
-    
-        if status == "Active":
-            print(f"access key has not been deactivated")
-
-            # Detract points
-            quests_api_client.post_score_event(
-                team_id=team_data["team-id"],
-                quest_id=QUEST_ID,
-                description=scoring_const.KEY_NOT_ROTATED_DESC,
-                points=scoring_const.KEY_NOT_ROTATED_POINTS
-            )
-        
-        elif status == "Inactive" or status == "Not found":
-                    
-            print(f"Awarding points. Key has been deactivated or deleted")
-
-            # Switch flag
-            team_data['is-accesskey-rotated'] = True
-
-            # Delete hint
-            response = quests_api_client.delete_hint(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                hint_key=hint_const.TASK3_HINT1_KEY,
-                detail=True
-            )
-            # Handling a response status code other than 200. In this case, we are just logging
-            if response['statusCode'] != 200:
-                print(response)
-
-            # Post task final message
             quests_api_client.post_output(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                key=output_const.TASK3_COMPLETE_KEY,
-                label=output_const.TASK3_COMPLETE_LABEL,
-                value=output_const.TASK3_COMPLETE_VALUE,
-                dashboard_index=output_const.TASK3_COMPLETE_INDEX,
-                markdown=output_const.TASK3_COMPLETE_MARKDOWN,
-            )
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=output_const.TASK3_KEY,
+                    label=output_const.TASK3_LABEL,
+                    value=output_const.TASK3_VALUE,
+                    dashboard_index=output_const.TASK3_INDEX,
+                    markdown=output_const.TASK3_MARKDOWN,
+                )
 
-            # Award final points
-            quests_api_client.post_score_event(
-                team_id=team_data["team-id"],
-                quest_id=QUEST_ID,
-                description=scoring_const.KEY_ROTATED_DESC,
-                points=scoring_const.KEY_ROTATED_POINTS
-            )
+            quests_api_client.post_input(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=input_const.TASK3_DEBUG_KEY,
+                    label=input_const.TASK3_DEBUG_LABEL,
+                    description=input_const.TASK3_DEBUG_DESCRIPTION,
+                    dashboard_index=input_const.TASK3_DEBUG_INDEX
+                )
+        else:
+            print("Task 3 - Conditions for execution not met")
+
+    else:
+        print("Task 3 not ready to be evaluated yet")
 
     return team_data
 

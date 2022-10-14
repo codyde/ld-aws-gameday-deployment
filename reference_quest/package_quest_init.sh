@@ -50,7 +50,10 @@ aws s3 cp ${QUEST_ARTIFACTS_ZIP} s3://${BUILD_QUEST_BUCKET_NAME}/${BUILD_QUEST_B
 
 echo -e "\nCopying application assets to S3 to seed in CodeCommit"
 cd ..
-aws s3 cp ${APP_ARTIFACTS_ZIP} s3://${BUILD_QUEST_BUCKET_NAME}//${APP_ARTIFACTS_ZIP}
+aws s3 cp ${APP_ARTIFACTS_ZIP} s3://${BUILD_QUEST_BUCKET_NAME}/${APP_ARTIFACTS_ZIP}
+
+echo -e "\nCopying team lambda source to S3"
+aws s3 cp team_lambda_source.zip s3://${BUILD_QUEST_BUCKET_NAME}/${BUILD_QUEST_BUCKET_PREFIX}${BUILD_QUEST_ID}/gdQuests-team-lambda-source.zip
 
 
 echo -e "\nUploading additional Quest artifacts to S3"
