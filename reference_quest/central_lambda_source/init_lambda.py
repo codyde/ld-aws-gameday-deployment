@@ -42,7 +42,7 @@ def lambda_handler(event, context):
     team_data = quests_api_client.get_team(team_id=team_id)
 
     # Retrieve CloudFormation stack outputs
-    accesskey_value = cfn_utils.retrieve_team_template_output_value(quests_api_client, QUEST_ID, team_data, "UserAccessKeyName")
+    # accesskey_value = cfn_utils.retrieve_team_template_output_value(quests_api_client, QUEST_ID, team_data, "UserAccessKeyName")
 
     # Populate the QUEST_TEAM_STATUS_TABLE for this team
     dynamo_put_response = quest_team_status_table.put_item(

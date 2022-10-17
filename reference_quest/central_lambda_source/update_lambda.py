@@ -160,6 +160,17 @@ def lambda_handler(event, context):
                     detail=True
                 )
 
+                # Stage Task 2 Things
+
+                quests_api_client.post_input(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=input_const.TASK2_LAUNCH_KEY,
+                    label=input_const.TASK2_LAUNCH_LABEL,
+                    description=input_const.TASK2_LAUNCH_DESCRIPTION,
+                    dashboard_index=input_const.TASK2_LAUNCH_INDEX
+                )
+
             else: 
                 if team_data['task1-attempted']:
                     print(f"The web application for team {team_data['team-id']} is DOWN")
@@ -284,6 +295,34 @@ def lambda_handler(event, context):
                     description=scoring_const.COMPLETE_DESC,
                     points=scoring_const.COMPLETE_POINTS
                 )
+
+                quests_api_client.post_input(
+                        team_id=team_data['team-id'],
+                        quest_id=QUEST_ID,
+                        key=input_const.TASK3_DEBUG_KEY,
+                        label=input_const.TASK3_DEBUG_LABEL,
+                        description=input_const.TASK3_DEBUG_DESCRIPTION,
+                        dashboard_index=input_const.TASK3_DEBUG_INDEX
+                    )
+
+                quests_api_client.post_output(
+                        team_id=team_data['team-id'],
+                        quest_id=QUEST_ID,
+                        key=output_const.TASK3_KEY,
+                        label=output_const.TASK3_LABEL,
+                        value=output_const.TASK3_VALUE,
+                        dashboard_index=output_const.TASK3_INDEX,
+                        markdown=output_const.TASK3_COMPLETE_MARKDOWN,
+                    )
+
+                # TASK3_KEY="task3"
+                # TASK3_LABEL="Task 3 - Uh, we've got a problem here. This data looks off."
+                # TASK3_VALUE="""
+                # Your team noticies significant amounts of debug data on the newly released Unicorn.Rentals site. You could quickly toggle off the feature flag to remove the problem website from view, but the team included a special feature flag in the code to assist with enabling the administrative debug menu. Your team will need to create a new feature flag in LaunchDarkly to enable this menu, but since we only want this menu displayed for specific users - we'll need to create a targeting rule to isolate access to only a specific individual.
+                # """
+                # TASK3_INDEX=30
+                # TASK3_MARKDOWN=True
+
             else: 
                 print("resetting app-version")
                 team_data['app-version'] = 'unknown'
@@ -299,12 +338,6 @@ def lambda_handler(event, context):
                     dashboard_index=21,
                     markdown=True,
                 )
-                
-                # TASK2_UNRELEASED_KEY="task2_app_unreleased"
-                # TASK2_UNRELEASED_LABEL="Still unreleased!"
-                # TASK2_UNRELEASED_INDEX=21
-                # TASK2_UNRELEASED_VALUE="The preview version of the page is still running"
-                # TASK2_UNRELEASED_MARKDOWN=True
 
                 quests_api_client.post_score_event(
                     team_id=team_data["team-id"],

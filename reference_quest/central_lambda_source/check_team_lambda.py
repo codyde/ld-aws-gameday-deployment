@@ -417,9 +417,9 @@ def getAppRelease(team_data):
         return False
 
 
-# Task 3 - Debug Mode Enablement
+# Task 3 - Debug 
 def evaluate_debug_mode(quests_api_client, team_data):
-    if ['start-task-3'] == True and not team_data['is-debug-mode'] and not team_data['task3-score-locked']:
+    if team_data['start-task-3'] == True and not team_data['is-debug-mode'] and not team_data['task3-score-locked']:
         print("Task 3 - Executing the start of debug mode module")
 
         if team_data['debugcode'] == 'unknown':
@@ -490,9 +490,9 @@ def evaluate_final_answer(quests_api_client, team_data):
 def check_and_complete_quest(quests_api_client, quest_id, team_data):
 
     # Check if everything is done
-    if (team_data['is-apprunner-done']           # Task 1
-        and team_data['is-cloudshell-launched']         # Task 2
-        and team_data['is-accesskey-rotated']           # Task 3
+    if (team_data['is-webapp-up']           # Task 1
+        and team_data['is-website-released']         # Task 2
+        and team_data['is-debug-mode']           # Task 3
         and team_data['is-answer-to-life-correct']):    # Task 4
 
         # Award quest complete points

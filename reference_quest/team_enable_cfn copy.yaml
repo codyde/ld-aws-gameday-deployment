@@ -105,25 +105,6 @@ Resources:
             Action:
             - logs:*
             Resource: "*"
-      - PolicyName: S3AccessPol
-        PolicyDocument:
-          Statement:
-          - Resource: "*"
-            Effect: Allow
-            Action:
-              - s3:*
-          - Resource: "arn:aws:s3:::*"
-            Effect: Allow
-            Action:
-              - s3:*
-      - PolicyName: ECRCleanup
-        PolicyDocument:
-          Statement:
-          - Resource: "*"
-            Effect: Allow
-            Action:
-              - ecr:*
-
       
   ResourceLookupLambda:
     Type: AWS::Lambda::Function
@@ -308,7 +289,7 @@ Resources:
       Environment:
         Variables:
           ACCOUNT_ID: !Ref AWS::AccountId
-          ECR_REPOSITORY_NAME: !Ref UnicornRentalsApp
+          ECR_REPOSITORY_NAME: !Ref UnicornRentalsECR
       Handler: index.lambda_handler
       Runtime: python3.9
       Role:
@@ -318,7 +299,7 @@ Resources:
     Type: Custom::CustomResource
     Properties:
       ServiceToken: !GetAtt CleanECR.Arn
-    DependsOn: UnicornRentalsApp
+    DependsOn: UnicornRentalsECR
 
   cleanupBucketOnDelete:
     Type: Custom::cleanupbucket
@@ -327,8 +308,10 @@ Resources:
       BucketName: !Ref CodePipelineArtifactBucket
     DependsOn: CodePipelineArtifactBucket
 
-  UnicornRentalsApp:
+  UnicornRentalsECR:
     Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: "NewUnicornRentals"
 
   MyAppRepo:
     Type: AWS::CodeCommit::Repository
@@ -358,7 +341,7 @@ Resources:
             Value: !Ref AWS::AccountId
             Type: PLAINTEXT
           - Name: REPOSITORY_URI
-            Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${UnicornRentalsApp}
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${UnicornRentalsECR}
             Type: PLAINTEXT
           - Name: NEXT_PUBLIC_LD_CLIENT_KEY
             Value: !Ref LaunchDarklyClientKey
@@ -375,7 +358,6 @@ Resources:
   Role:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: 'AppRunnerRole'
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
@@ -396,28 +378,50 @@ Resources:
                 - dynamodb:ConditionCheckItem
               Resource:
                 - !GetAtt GamedayDB.Arn
-        - PolicyName: S3Stuff
+        - PolicyName: root
           PolicyDocument:
             Statement:
               - Resource: "*"
                 Effect: Allow
                 Action:
-                  - s3:*
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:GetBucketVersioning
               - Resource: "arn:aws:s3:::*"
                 Effect: Allow
                 Action:
-                  - s3:*
-        - PolicyName: ECRAccessGD
-          PolicyDocument:
-            Statement:
-              - Resource: "*"
-                Effect: Allow
-                Action:
-                  - ecr:*
-              - Resource: "arn:aws:ecr:::*"
-                Effect: Allow
-                Action:
-                  - ecr:*
+                  - s3:PutObject
+
+  # AppRunnerCanaryService:
+  #   Type: AWS::AppRunner::Service
+  #   Properties:
+  #     SourceConfiguration:
+  #       AuthenticationConfiguration:
+  #           AccessRoleArn: !Sub arn:aws:iam::${AWS::AccountId}:role/service-role/AppRunnerECRAccessRole
+  #       ImageRepository:
+  #         ImageRepositoryType: "ECR"
+  #         ImageIdentifier: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${MyAppImage}:latest
+  #         ImageConfiguration:
+  #           Port: "5000"
+  #           RuntimeEnvironmentVariables:
+  #             -
+  #               Name: LD_SERVER_KEY
+  #               Value: !Ref LaunchDarklyServerKey
+  #             - Name: NEXT_PUBLIC_TEAM_ID
+  #               Value: !Ref TeamName
+  #       AutoDeploymentsEnabled: false
+  #     HealthCheckConfiguration:
+  #       Protocol: "TCP"
+  #       Interval: "2"
+  #       Path: '/'
+  #       Timeout: "5"
+  #       HealthyThreshold: "1"
+  #       UnhealthyThreshold: "5"
+  #     InstanceConfiguration:
+  #       Cpu: "1024"
+  #       Memory: "2048"
+  #   DependsOn: WaitCondition
+
 
   MyAppPipeline:
     Type: 'AWS::CodePipeline::Pipeline'
@@ -552,7 +556,7 @@ Resources:
                 Action:
                   - ecr:*
                 Resource:
-                  - !GetAtt UnicornRentalsApp.Arn
+                  - !GetAtt UnicornRentalsECR.Arn
               - Effect: Allow
                 Action:
                   - lambda:InvokeFunction

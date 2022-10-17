@@ -23,7 +23,7 @@ As the Cloud Administrator at Unicorn.Rentals, you'll need to deploy the image f
 
 * Set the App Runner to `deploy automatically on new image`
 * Set the port for the App Runner application to `5000`
-* Create an environment variable during your App Runner deployment your **LaunchDarkly Server SDK** key named `LD_SDK_KEY`. **Note:** You will find the value in the LaunchDarkly console
+* Create an environment variable during your App Runner deployment your **LaunchDarkly Server SDK** key named `LD_SERVER_KEY`. **Note:** You will find the value in the LaunchDarkly console
 * Create an environment variable for your **Team ID** named `TEAM_ID`
 * On the security tab, ensure you have selected an **INSTANCE ROLE** to allow connectivity to the necessary Unicorn.Rentals cloud resources 
 
@@ -82,7 +82,7 @@ TASK2_UNRELEASED_MARKDOWN=True
 TASK2_COMPLETE_KEY="task2_complete"
 TASK2_COMPLETE_LABEL="The new Unicorn.Rentals is **LIVE** for user traffic!"
 TASK2_COMPLETE_VALUE="""
-Toggling the feature flag on for `SiteRelease` has enabled the new version of the Unicorn.Rentals website, however, something looks wrong. You can see debug messages reflected in the card views on the main page. Looks like the it's time to dig in and figure out what went wrong!
+Toggling the feature flag on for `SiteRelease` has enabled the new version of the Unicorn.Rentals website, however, something looks wrong. You can see debug messages reflected in the card views on the main page. Looks like it's time to dig in and figure out what went wrong!
 """
 TASK2_COMPLETE_INDEX=29
 TASK2_COMPLETE_MARKDOWN=True
@@ -92,7 +92,19 @@ TASK2_COMPLETE_MARKDOWN=True
 TASK3_KEY="task3"
 TASK3_LABEL="Task 3 - Uh, we've got a problem here. This data looks off."
 TASK3_VALUE="""
-Your team noticies significant amounts of debug data on the newly released Unicorn.Rentals site. You could quickly toggle off the feature flag to remove the problem website from view, but the team included a special feature flag in the code to assist with enabling the administrative debug menu. Your team will need to create a new feature flag in LaunchDarkly to enable this menu, but since we only want this menu displayed for specific users - we'll need to create a targeting rule to isolate access to only a specific individual.
+Your team noticies significant amounts of debug data on the newly released Unicorn.Rentals site. You could leverage a "kill switch" in LaumnchDarkly to quickly turn the feature flag off for all users, removing the problem website from view, but our innovative teams have given us another option.
+
+The development team has placed enhanced logging for both our server and client side behind a feature flag. This allows teams to activate enhanced logging for specific users to help isolate problems. Your team will need to create and manage this feature flag in LaunchDarkly and configure the target to be our `debuguser`. 
+
+##### Feature Flag Details to Create in LaunchDarkly
+* **Feature Flag Name** - `logMode` 
+* **Flag Type** - String
+* **Variation 1** - Value `debug`, Name -  Debug
+* **Variation 2** - Value `default`, Name - Default Logging
+* **Default Variation** for `On` and `Off` to be Default Logs
+* **Individual Targeting** - set `debuguser` to receive the `Debug` feature flag value
+
+Once enabled, login as `debuguser` to view the administrative menu, you can enter the value from this UI menu or visit the `/teamdebug` API route and enter the `debug-code` value in the input below. 
 """
 TASK3_INDEX=30
 TASK3_MARKDOWN=True
