@@ -40,6 +40,22 @@ def lambda_handler(event, context):
 
     # Get team data for this quest
     team_data = quests_api_client.get_team(team_id=team_id)
+    team_table = team_data['table-number']
+
+    ## get LD credentials, which should've been filled out prior to starting the Event
+    xa_session = quests_api_client.assume_team_ops_role(team_data['team-id'])
+    xa_ssm_client = xa_session.client('ssm') # get team's SSM client
+    ld_server_key = xa_ssm_client.get_parameter(Name='LD-ServerKey', WithDecryption=True)['Parameter']['Value']
+    ld_client_key = xa_ssm_client.get_parameter(Name='LD-ClientKey', WithDecryption=True)['Parameter']['Value']
+    ld_signonurl = xa_ssm_client.get_parameter(Name='LD-SignOnUrl', WithDecryption=True)['Parameter']['Value']
+
+
+    if ld_server_key == "OPERATOR_FILL" or ld_client_key == "OPERATOR_FILL":
+        print("********************************************************************************************")
+        print(f"Operator has not properly configured Gremlin assets vending machine, aborting INIT_LAMBDA!!")
+        print("********************************************************************************************")
+        return
+
 
     # Retrieve CloudFormation stack outputs
     # accesskey_value = cfn_utils.retrieve_team_template_output_value(quests_api_client, QUEST_ID, team_data, "UserAccessKeyName")
@@ -94,6 +110,16 @@ def lambda_handler(event, context):
         value=output_const.TASK1_VALUE.format(GAMEDAY_REGION),
         dashboard_index=output_const.TASK1_INDEX,
         markdown=output_const.TASK1_MARKDOWN,
+    )
+
+    # Post task 1 CREDENTIALS  # TODO: pretty this up
+    quests_api_client.post_output(
+        team_id=team_id,
+        quest_id=QUEST_ID,
+        key=output_const.TASK1_CREDS_KEY,
+        value=f"{output_const.TASK1_CREDS_VALUE} **TEAM ID:** {team_table}   **LD_SERVER_KEY:** {ld_server_key}   **LD_CLIENT_KEY:** {ld_client_key}  **LD-SignOnUrl:** {ld_signonurl}",
+        dashboard_index=output_const.TASK1_CREDS_INDEX,
+        markdown=output_const.TASK1_CREDS_MARKDOWN,
     )
 
     quests_api_client.post_input(

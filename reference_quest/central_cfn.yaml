@@ -247,6 +247,34 @@ Resources:
           ASSETS_BUCKET: !Ref StaticAssetsBucket
           ASSETS_BUCKET_PREFIX: !Ref StaticAssetsKeyPrefix
 
+  AcctVendingLambda:
+    Type: AWS::Lambda::Function
+    Description: Perform Acct Vending
+    Properties:
+      Handler: "load_id_creds.lambda_handler"
+      Runtime: python3.9
+      Timeout: '30'
+      Code:
+        S3Bucket: !Ref DeployAssetsBucket
+        S3Key: !Join
+        - ''
+        - - !Ref DeployAssetsKeyPrefix
+          - !Ref QuestLambdaSourceKey
+      Environment:
+        Variables:
+          QUEST_API_TOKEN: !Join [ '', [ '{{resolve:secretsmanager:', !Ref gdQuestsAPITokenSecretName, ':SecretString}}' ] ]
+          QUEST_ID: !Ref QuestId
+          QUEST_API_BASE: !Ref gdQuestsAPIBase
+          GAMEDAY_REGION: !Ref AWS::Region
+          ASSETS_BUCKET: !Ref StaticAssetsBucket
+          ASSETS_BUCKET_PREFIX: !Ref StaticAssetsKeyPrefix
+      Role: !GetAtt LambdaRole.Arn
+
+  AcctVendingCustomResource:
+    Type: Custom::AcctVendingCustomResource
+    Properties:
+      ServiceToken: !GetAtt AcctVendingLambda.Arn
+
 # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
 # ║ AWS GameDay Quests - Other Resources                                                                                                                     ║
 # ╠═══════════════════════════════╤═════════════════════════════╤════════════════════════════════════════════════════════════════════════════════════════════╣
@@ -310,6 +338,16 @@ Resources:
             Action:
             - 'sts:AssumeRole'
             Resource: '*'
+      - PolicyName: LaunchDarklySSMParamPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+              - ssm:PutParameter
+            Resource: "*"
 
 Outputs:
   TableName:
