@@ -33,21 +33,6 @@ Parameters:
     Default: Archive.zip
     Description: S3 key for the dummy zip file containing the buildspec_prod.yml and dockerfile
     Type: String
-## TODO - Static value - Should come from a row of the account CSV - should bring in from a central location during deployment
-#  LaunchDarklyClientKey:
-#    Default: '633b74a2fe345710e2d19def'
-#    Description: Client SDK Key for LaunchDarkly configuration
-#    Type: String
-## TODO Static value - Should come from a row of the account CSV - should bring in from a central location during deployment
-#  LaunchDarklyServerKey:
-#    Default: 'sdk-64c0dc04-2f47-4843-a0dd-05ca5bd5b849'
-#    Description: Server SDK Key for LaunchDarkly configuration
-#    Type: String
-## TODO - Static value - Should come from a row of the account CSV - This should align to their table name - I use this to query a Dynamo table that will be created in the central account that will have various validation values
-#  TeamName:
-#    Default: '1'
-#    Description: AWS Gameday Table Number
-#    Type: String
 # TODO - Evaluate if this should be as static as it is - will this collide with other users? It won't if they have their own individual accounts
   AppRepoName:
     Default: 'app-gameday-ld'
