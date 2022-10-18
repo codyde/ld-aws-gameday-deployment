@@ -23,7 +23,7 @@ Parameters:
     Description: The name of the S3 bucket where assets are stored
     Type: String
   DeployAssetsKeyPrefix:
-    # Default: modules/9c0e89820b864addaed45ec2f5440379/v5/2ae514a9-a6dc-4fc0-a797-3f4a7bbd1d63
+    # Default: modules/9c0e89820b864addaed45ec2f5440379/v5/7bb514a9-a6dc-4fc0-a797-3f4a7bbd17bb
     Description: S3 key prefix where assets are stored
     Type: String
   StaticAssetsBucket:
@@ -37,7 +37,7 @@ Parameters:
 
   # Additional parameters required by this template - These parameters MUST contain default values that will be used when the Quests API deploys this quest.
   QuestId:
-    Default: 2ae514a9-a6dc-4fc0-a797-3f4a7bbd1d63
+    Default: 7bb514a9-a6dc-4fc0-a797-3f4a7bbd17bb
     Description: The ID assigned to this quest
     Type: String
   QuestLambdaSourceKey:
