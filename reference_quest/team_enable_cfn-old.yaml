@@ -15,7 +15,7 @@ Parameters:
     Type: String
   # Additional parameters required by this template
   QuestId:
-    Default: 2ae514a9-a6dc-4fc0-a797-3f4a7bbd1d63
+    Default: 7bb514a9-a6dc-4fc0-a797-3f4a7bbd17bb
     Description: The ID assigned to this quest
     Type: String
   TeamLambdaSourceKey:
