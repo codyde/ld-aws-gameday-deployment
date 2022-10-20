@@ -77,6 +77,7 @@ def lambda_handler(event, context):
                         xa_ssm_client.get_parameter(Name='LD-ServerKey', WithDecryption=True)['Parameter']['Value']
                         xa_ssm_client.get_parameter(Name='LD-ClientKey', WithDecryption=True)['Parameter']['Value']
                         xa_ssm_client.get_parameter(Name='LD-SignInUrl', WithDecryption=True)['Parameter']['Value']
+                        xa_ssm_client.get_parameter(Name='TableNumber', WithDecryption=True)['Parameter']['Value']
                         print(f"Acct Vending Credentials already loaded for team {team['team-id']}, ignoring...")
                     except Exception as e:
                         # only add if not already present
@@ -86,21 +87,28 @@ def lambda_handler(event, context):
                                                     Value=launchdarkly_credentials['serverkey'],
                                                     Overwrite=True,
                                                     Tier="Standard",
-                                                    Type="SecureString",
+                                                    Type="String",
                                                     DataType="text")
                         xa_ssm_client.put_parameter(Name='LD-ClientKey',
                                                     Description="LaunchDarkly Client key",
                                                     Value=launchdarkly_credentials['clientkey'],
                                                     Overwrite=True,
                                                     Tier="Standard",
-                                                    Type="SecureString",
+                                                    Type="String",
                                                     DataType="text")
                         xa_ssm_client.put_parameter(Name='LD-SignOnUrl',
                                                     Description="LaunchDarkly SignOn URL",
                                                     Value=launchdarkly_credentials['signonurl'],
                                                     Overwrite=True,
                                                     Tier="Standard",
-                                                    Type="SecureString",
+                                                    Type="String",
+                                                    DataType="text")
+                        xa_ssm_client.put_parameter(Name='TableNumber',
+                                                    Description="Table Number of the Team",
+                                                    Value=launchdarkly_credentials['table'],
+                                                    Overwrite=True,
+                                                    Tier="Standard",
+                                                    Type="String",
                                                     DataType="text")
 
 

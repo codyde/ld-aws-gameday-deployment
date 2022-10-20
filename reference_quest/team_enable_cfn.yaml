@@ -38,7 +38,20 @@ Parameters:
     Default: 'app-gameday-ld'
     Description: Gameday Repo Name
     Type: String
+  LaunchDarklyClientKeySsmParam:
+    Default: 'LD-ClientKey'
+    Description: Client SDK Key for LaunchDarkly configuration
+    Type: AWS::SSM::Parameter::Value<String>
 
+  LaunchDarklyServerKeySsmParam:
+    Default: 'LD-ServerKey'
+    Description: Server SDK Key for LaunchDarkly configuration
+    Type: AWS::SSM::Parameter::Value<String>
+# I use this to query a Dynamo table that will be created in the central account that will have various validation values
+  TeamTableSsmParam:
+    Default: 'TableNumber'
+    Description: AWS Gameday Table Number
+    Type: AWS::SSM::Parameter::Value<String>
 
 Resources: 
   # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
@@ -345,13 +358,13 @@ Resources:
             Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${UnicornRentalsApp}
             Type: PLAINTEXT
           - Name: NEXT_PUBLIC_LD_CLIENT_KEY
-            Value: ''
+            Value: !Ref LaunchDarklyClientKeySsmParam
             Type: PLAINTEXT
           - Name: LD_SERVER_KEY
-            Value: ''
+            Value: !Ref LaunchDarklyServerKeySsmParam
             Type: PLAINTEXT
           - Name: NEXT_PUBLIC_TEAM_ID
-            Value: ''
+            Value: !Ref TeamTableSsmParam
             Type: PLAINTEXT
       Name: !Sub ${AWS::StackName}-image-build
       ServiceRole: !Ref CodePipelineServiceRole
@@ -461,7 +474,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: codepipeline:StartPipelineExecution
-                Resource: !Sub arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${MyAppPipeline}
+                Resource: !Sub arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${LaunchDarklyPipeline}
 
   # This role is used by CodePipeline to trigger deployments
   CodePipelineServiceRole:
