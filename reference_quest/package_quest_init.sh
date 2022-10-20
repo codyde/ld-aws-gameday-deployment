@@ -4,12 +4,12 @@
 #!/bin/bash
 
 QUEST_ROOT_DIR=${PWD}
-BUILD_QUEST_NAME=reference_quest
-BUILD_QUEST_ID=2ae514a9-a6dc-4fc0-a797-3f4a7bbd1d63
+BUILD_QUEST_NAME=LaunchDarkly Flags
+BUILD_QUEST_ID=7bb514a9-a6dc-4fc0-a797-3f4a7bbd17bb
 BUILD_QUEST_BUCKET_NAME=${QDK_ASSETS_BUCKET}                              # when deploying locally
 #BUILD_QUEST_BUCKET_NAME=ee-assets-prod-us-east-1                         # when deploying to production
 # Include trailing / if a value is defined!
-BUILD_QUEST_BUCKET_PREFIX=                                                # when deploying locally
+BUILD_QUEST_BUCKET_PREFIX=                                              # when deploying locally
 #BUILD_QUEST_BUCKET_PREFIX=modules/9c0e89820b864addaed45ec2f5440379/v5/   # when deploying to production
 QUEST_ARTIFACTS_ZIP=gdQuests-${BUILD_QUEST_ID}-quest-artifacts.zip        # don't change
 APP_ARTIFACTS_ZIP=Archive.zip
@@ -55,11 +55,6 @@ aws s3 cp ${APP_ARTIFACTS_ZIP} s3://${BUILD_QUEST_BUCKET_NAME}/${APP_ARTIFACTS_Z
 echo -e "\nCopying team lambda source to S3"
 aws s3 cp team_lambda_source.zip s3://${BUILD_QUEST_BUCKET_NAME}/${BUILD_QUEST_BUCKET_PREFIX}${BUILD_QUEST_ID}/gdQuests-team-lambda-source.zip
 
-
-echo -e "\nUploading additional Quest artifacts to S3"
-cd ${QUEST_ROOT_DIR}
-aws s3 cp artifacts/images/curl.jpeg s3://${BUILD_QUEST_BUCKET_NAME}/${BUILD_QUEST_BUCKET_PREFIX}${BUILD_QUEST_ID}/curl.jpeg ${PROFILE_ARGUMENT}
-  
 
 
 echo Complete: $(date)

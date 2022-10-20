@@ -14,7 +14,7 @@ Parameters:
     Description: S3 key prefix where assets are stored
     Type: String
   QuestId:
-    Default: 2ae514a9-a6dc-4fc0-a797-3f4a7bbd1d63
+    Default: 7bb514a9-a6dc-4fc0-a797-3f4a7bbd17bb
     Description: The ID assigned to this quest
     Type: String
   TeamLambdaSourceKey:
@@ -33,27 +33,25 @@ Parameters:
     Default: Archive.zip
     Description: S3 key for the dummy zip file containing the buildspec_prod.yml and dockerfile
     Type: String
-# TODO - Static value - Should come from a row of the account CSV - should bring in from a central location during deployment
-  LaunchDarklyClientKey:
-    Default: '633b74a2fe345710e2d19def'
-    Description: Client SDK Key for LaunchDarkly configuration
-    Type: String
-# TODO Static value - Should come from a row of the account CSV - should bring in from a central location during deployment
-  LaunchDarklyServerKey:
-    Default: 'sdk-64c0dc04-2f47-4843-a0dd-05ca5bd5b849'
-    Description: Server SDK Key for LaunchDarkly configuration
-    Type: String
-# TODO - Static value - Should come from a row of the account CSV - This should align to their table name - I use this to query a Dynamo table that will be created in the central account that will have various validation values 
-  TeamName:
-    Default: '1'
-    Description: AWS Gameday Table Number
-    Type: String
 # TODO - Evaluate if this should be as static as it is - will this collide with other users? It won't if they have their own individual accounts
   AppRepoName:
     Default: 'app-gameday-ld'
     Description: Gameday Repo Name
     Type: String
+  LaunchDarklyClientKeySsmParam:
+    Default: 'LD-ClientKey'
+    Description: Client SDK Key for LaunchDarkly configuration
+    Type: AWS::SSM::Parameter::Value<String>
 
+  LaunchDarklyServerKeySsmParam:
+    Default: 'LD-ServerKey'
+    Description: Server SDK Key for LaunchDarkly configuration
+    Type: AWS::SSM::Parameter::Value<String>
+# I use this to query a Dynamo table that will be created in the central account that will have various validation values
+  TeamTableSsmParam:
+    Default: 'TableNumber'
+    Description: AWS Gameday Table Number
+    Type: AWS::SSM::Parameter::Value<String>
 
 Resources: 
   # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
@@ -67,6 +65,7 @@ Resources:
   # ║ DeveloperUser         │ AWS::IAM::User              │ The IAM user pretended to be compromised                                                           ║
   # ║ AccessKeys            │ AWS::IAM::AccessKey         │ The "compromised" access key for DeveloperUser                                                     ║
   # ╚═══════════════════════╧═════════════════════════════╧════════════════════════════════════════════════════════════════════════════════════════════════════╝
+
 
   LambdaRole:
     Type: "AWS::IAM::Role"
@@ -189,9 +188,7 @@ Resources:
               },
             }
             cfnresponse.send(event, context, cfnresponse.SUCCESS, response) 
-      Environment:
-        Variables:
-          id: !Ref TeamName
+
       Handler: index.handler
       Role:
         Fn::GetAtt: [ LambdaRole , "Arn" ]
@@ -361,13 +358,13 @@ Resources:
             Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${UnicornRentalsApp}
             Type: PLAINTEXT
           - Name: NEXT_PUBLIC_LD_CLIENT_KEY
-            Value: !Ref LaunchDarklyClientKey
+            Value: !Ref LaunchDarklyClientKeySsmParam
             Type: PLAINTEXT
           - Name: LD_SERVER_KEY
-            Value: !Ref LaunchDarklyServerKey
+            Value: !Ref LaunchDarklyServerKeySsmParam
             Type: PLAINTEXT
           - Name: NEXT_PUBLIC_TEAM_ID
-            Value: !Ref TeamName
+            Value: !Ref TeamTableSsmParam
             Type: PLAINTEXT
       Name: !Sub ${AWS::StackName}-image-build
       ServiceRole: !Ref CodePipelineServiceRole
@@ -419,13 +416,13 @@ Resources:
                 Action:
                   - ecr:*
 
-  MyAppPipeline:
+  LaunchDarklyPipeline:
     Type: 'AWS::CodePipeline::Pipeline'
     Properties:
       ArtifactStore:
         Type: S3
         Location: !Ref CodePipelineArtifactBucket
-      Name: !Sub ${AWS::StackName}
+      Name: LaunchDarkly-app-pipeline
       RoleArn: !GetAtt CodePipelineServiceRole.Arn
       Stages:
         - Name: 'Source'
@@ -477,7 +474,7 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: codepipeline:StartPipelineExecution
-                Resource: !Sub arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${MyAppPipeline}
+                Resource: !Sub arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${LaunchDarklyPipeline}
 
   # This role is used by CodePipeline to trigger deployments
   CodePipelineServiceRole:
