@@ -34,6 +34,12 @@ When your deployment is complete and running successfully, enter the full URL (i
 TASK1_INDEX=10
 TASK1_MARKDOWN=True
 
+# TASK 1 - For outputting LD credentials
+TASK1_CREDS_KEY="task1_creds"
+TASK1_CREDS_VALUE="Use the following credentials: "
+TASK1_CREDS_INDEX=10
+TASK1_CREDS_MARKDOWN=True
+
 TASK1_APPRUNNER_WRONG_KEY="task1_bad_url"
 TASK1_APPRUNNER_WRONG_LABEL="Well - there's nothing here"
 TASK1_APPRUNNER_WRONG_VALUE="""
