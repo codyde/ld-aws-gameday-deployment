@@ -62,7 +62,7 @@ TASK1_COMPLETE_MARKDOWN=True
 TASK2_KEY="task2"
 TASK2_LABEL="Task 2 - Releasing the new Unicorn.Rentals!"
 TASK2_VALUE="""
-You just received a notification from the web development team that the new version of the Unicorn.Rentals website is ready for user testing! They have pushed their changed to the site already, but also included a **[feature flag value](https://github.com/codyde/ld-aws-gameday/blob/a61d1857bc5e7042de095d6f896facc7f048931b/pages/index.js#L54)** that is preventing it from being seen by most users. As an administrator of the feature management team, it's now up to you to create a flag in LaunchDarkly that allows users to see the new website.  
+You just received a notification from the web development team that the new version of the Unicorn.Rentals website is ready for user testing! They have pushed their changed to the site already, but also included a **[feature flag value](https://github.com/codyde/ld-aws-gameday/blob/a61d1857bc5e7042de095d6f896facc7f048931b/pages/index.js#L54)** that is preventing it from being seen by most users. as the engineer helping roll out the new site and release the changes, it's now up to you to create a flag in LaunchDarkly that allows users to see the new website.  
 
 Once enabled, the Unicorn.Rentals UI will update, and you'll be able to access a new API on the `/status` route, which you can use to validate that the correct version of Unicorn.Rentals has launched! When you're creating the flag, keep in mind that we are just saying that the new site is available, true or false, choose the flag type that matches these options.   
 """
