@@ -68,21 +68,17 @@ TASK1_COMPLETE_MARKDOWN=True
 TASK2_KEY="task2"
 TASK2_LABEL="Task 2 - Releasing the new Unicorn.Rentals!"
 TASK2_VALUE="""
-The Unicorn.Rentals website is deployed, but currently running in stealth mode, hidden behind **[feature flags](https://launchdarkly.com/blog/what-are-feature-flags/)**. To get the new site launched, your team will need to create the feature flag in [LaunchDarkly](https://www.launchdarkly.com) and activate it for your users. Navigate into your LaunchDarkly account, create the feature flag listed below, and enable it. 
+You just received a notification from the web development team that the new version of the Unicorn.Rentals website is ready for user testing! They have pushed their changed to the site already, but also included a **[feature flag value](https://github.com/codyde/ld-aws-gameday/blob/a61d1857bc5e7042de095d6f896facc7f048931b/pages/index.js#L54)** that is preventing it from being seen by most users. as the engineer helping roll out the new site and release the changes, it's now up to you to create a flag in LaunchDarkly that allows users to see the new website.  
 
-##### Feature Flag Details to Create in LaunchDarkly
-* **Feature Flag Name** - `SiteRelease` 
-* **Flag Type** - Boolean
-
-Once enabled, the Unicorn.Rentals UI will update, and you'll be able to access a new API on the `/status` route, which you can use to validate that the correct version of Unicorn.Rentals has launched!
+Once enabled, the Unicorn.Rentals UI will update, and you'll be able to access a new API on the `/status` route, which you can use to validate that the correct version of Unicorn.Rentals has launched! When you're creating the flag, keep in mind that we are just saying that the new site is available, true or false, choose the flag type that matches these options.   
 """
 TASK2_INDEX=20
 TASK2_MARKDOWN=True
 
 TASK2_UNRELEASED_KEY="task2_app_unreleased"
-TASK2_UNRELEASED_LABEL="This status doesn't look very good..."
+TASK2_UNRELEASED_LABEL="Uh oh... This status doesn't look very good..."
 TASK2_UNRELEASED_INDEX=21
-TASK2_UNRELEASED_VALUE="The status code you entered is incorrect. Is the website actually released? Check your feature flag key and ensure it matches `SiteRelease` and try again!"
+TASK2_UNRELEASED_VALUE="The status code you entered is incorrect. Is the website actually released? Check your feature flag key and ensure it matches what the development team has in their code!"
 TASK2_UNRELEASED_MARKDOWN=True
 
 TASK2_COMPLETE_KEY="task2_complete"
