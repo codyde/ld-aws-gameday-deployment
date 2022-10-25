@@ -21,11 +21,11 @@ The pipelines have ran and its time to deploy our new Unicorn.Rentals into AWS! 
 
 As the Cloud Administrator at Unicorn.Rentals, you'll need to deploy the image for the website to AWS App Runner. As part of this exercise, ensure the following configurations are applied: 
 
-* Set the App Runner to `deploy automatically on new image`
+* Search for `Unicorn` in the image list, and use this as your image
 * Set the port for the App Runner application to `5000`
-* Create an environment variable during your App Runner deployment your **LaunchDarkly Server SDK** key named `LD_SERVER_KEY`. **Note:** You will find the value in the LaunchDarkly console
-* Create an environment variable for your **Team ID** named `TEAM_ID`
-* On the security tab, ensure you have selected an **INSTANCE ROLE** to allow connectivity to the necessary Unicorn.Rentals cloud resources 
+* Create an environment variable during your App Runner deployment for your **LaunchDarkly Server SDK**. Use a key named `LD_SERVER_KEY` with the value from the credentails above or from within the LaunchDarkly console. The client side SDK is not needed for this step. 
+* Create an additional environment variable for your **Team ID** with a key named `TEAM_ID` and a value of 1 (TODO: Replace this with language for "the team ID")
+* On the security tab, ensure you have selected the **instance role** titled **LD-AppRunner-Policy** to allow connectivity to the necessary Unicorn.Rentals cloud resources 
 
 When your deployment is complete and running successfully, enter the full URL (including https://) below and the system will validate if the application is up! 
 
@@ -36,7 +36,9 @@ TASK1_MARKDOWN=True
 
 # TASK 1 - For outputting LD credentials
 TASK1_CREDS_KEY="task1_creds"
-TASK1_CREDS_VALUE="Use the following credentials: "
+TASK1_CREDS_VALUE=f"""
+### Use the following credentials: 
+"""
 TASK1_CREDS_INDEX=10
 TASK1_CREDS_MARKDOWN=True
 
@@ -98,9 +100,11 @@ TASK2_COMPLETE_MARKDOWN=True
 TASK3_KEY="task3"
 TASK3_LABEL="Task 3 - Uh, we've got a problem here. This data looks off."
 TASK3_VALUE="""
-Your team noticies significant amounts of debug data on the newly released Unicorn.Rentals site. You could leverage a "kill switch" in LaumnchDarkly to quickly turn the feature flag off for all users, removing the problem website from view, but our innovative teams have given us another option.
+Your team noticies significant amounts of debug data on the newly released Unicorn.Rentals site. You could leverage a "kill switch" in LaunchDarkly to quickly turn the feature flag off for all users, removing the problem website from view, but our innovative teams have given us another option.
 
-The development team has placed enhanced logging for both our server and client side behind a feature flag. This allows teams to activate enhanced logging for specific users to help isolate problems. Your team will need to create and manage this feature flag in LaunchDarkly and configure the target to be our `debuguser`. 
+The development team has placed enhanced logging for both our server and client side behind a feature flag. This allows teams to activate enhanced logging for specific users to help isolate problems. Your team will need to create and manage this feature flag in LaunchDarkly and configure the target to be our `debuguser`.
+
+We will use multiple variations within LaunchDarkly to confiugure different potential values that our feature flags may resolve to. 
 
 ##### Feature Flag Details to Create in LaunchDarkly
 * **Feature Flag Name** - `logMode` 

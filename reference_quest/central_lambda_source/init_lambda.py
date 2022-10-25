@@ -117,10 +117,25 @@ def lambda_handler(event, context):
         team_id=team_id,
         quest_id=QUEST_ID,
         key=output_const.TASK1_CREDS_KEY,
-        value=f"{output_const.TASK1_CREDS_VALUE} **TEAM ID:** {team_table}   **LD_SERVER_KEY:** {ld_server_key}   **LD_CLIENT_KEY:** {ld_client_key}  **LD-SignOnUrl:** {ld_signonurl}",
+        value=f"""
+        ### {output_const.TASK1_CREDS_VALUE} 
+        * **TEAM ID:** {team_table}   
+        * **LD_SERVER_KEY:** {ld_server_key}   
+        * **LD_CLIENT_KEY:** {ld_client_key}  
+        * **LD-SignOnUrl:** {ld_signonurl}
+        """,
         dashboard_index=output_const.TASK1_CREDS_INDEX,
         markdown=output_const.TASK1_CREDS_MARKDOWN,
     )
+
+    # quests_api_client.post_output(
+    #     team_id=team_id,
+    #     quest_id=QUEST_ID,
+    #     key=output_const.TASK1_CREDS_KEY,
+    #     value=f"{output_const.TASK1_CREDS_VALUE} **TEAM ID:** {team_table}   **LD_SERVER_KEY:** {ld_server_key}   **LD_CLIENT_KEY:** {ld_client_key}  **LD-SignOnUrl:** {ld_signonurl}",
+    #     dashboard_index=output_const.TASK1_CREDS_INDEX,
+    #     markdown=output_const.TASK1_CREDS_MARKDOWN,
+    # )
 
     quests_api_client.post_input(
         team_id=team_data['team-id'],
