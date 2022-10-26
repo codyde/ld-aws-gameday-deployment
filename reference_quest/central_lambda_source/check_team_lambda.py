@@ -408,35 +408,35 @@ def check_and_complete_quest(quests_api_client, quest_id, team_data):
 
         # Award quest complete points
         print(f"Team {team_data['team-id']} has completed this quest, posting output and awarding points")
-        quests_api_client.post_score_event(
-            team_id=team_data["team-id"],
-            quest_id=quest_id,
-            description=scoring_const.QUEST_COMPLETE_DESC,
-            points=scoring_const.QUEST_COMPLETE_POINTS
-        )
+        # quests_api_client.post_score_event(
+        #     team_id=team_data["team-id"],
+        #     quest_id=quest_id,
+        #     description=scoring_const.QUEST_COMPLETE_DESC,
+        #     points=scoring_const.QUEST_COMPLETE_POINTS
+        # )
 
-        # Award quest complete bonus points
-        bonus_points = calculate_bonus_points(quests_api_client, quest_id, team_data)
-        quests_api_client.post_score_event(
-            team_id=team_data["team-id"],
-            quest_id=quest_id,
-            description=scoring_const.QUEST_COMPLETE_BONUS_DESC,
-            points=bonus_points
-        )
+        # # Award quest complete bonus points
+        # bonus_points = calculate_bonus_points(quests_api_client, quest_id, team_data)
+        # quests_api_client.post_score_event(
+        #     team_id=team_data["team-id"],
+        #     quest_id=quest_id,
+        #     description=scoring_const.QUEST_COMPLETE_BONUS_DESC,
+        #     points=bonus_points
+        # )
 
-        # Post quest complete message
-        quests_api_client.post_output(
-            team_id=team_data['team-id'],
-            quest_id=quest_id,
-            key=output_const.QUEST_COMPLETE_KEY,
-            label=output_const.QUEST_COMPLETE_LABEL,
-            value=output_const.QUEST_COMPLETE_VALUE,
-            dashboard_index=output_const.QUEST_COMPLETE_INDEX,
-            markdown=output_const.QUEST_COMPLETE_MARKDOWN,
-        )
+        # # Post quest complete message
+        # quests_api_client.post_output(
+        #     team_id=team_data['team-id'],
+        #     quest_id=quest_id,
+        #     key=output_const.QUEST_COMPLETE_KEY,
+        #     label=output_const.QUEST_COMPLETE_LABEL,
+        #     value=output_const.QUEST_COMPLETE_VALUE,
+        #     dashboard_index=output_const.QUEST_COMPLETE_INDEX,
+        #     markdown=output_const.QUEST_COMPLETE_MARKDOWN,
+        # )
 
-        # Complete quest
-        quests_api_client.post_quest_complete(team_id=team_data['team-id'], quest_id=quest_id)
+        # # Complete quest
+        # quests_api_client.post_quest_complete(team_id=team_data['team-id'], quest_id=quest_id)
 
         return True
 

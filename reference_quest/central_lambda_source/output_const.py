@@ -5,9 +5,9 @@
 WELCOME_KEY="welcome"
 WELCOME_LABEL="Welcome to the (soon to be) NEW Unicorn.Rentals"
 WELCOME_VALUE="""
-At Unicorn.Rentals, we hire dreamers not just "techs”. We seek those who share our vision and are willing to put in extra hours to take our offering of mythical creatures to the next level. Our solutions are diverse and the things wer are building are going to delight our users. 
+At Unicorn.Rentals, we hire dreamers not just "techs”. We seek those who share our vision and are willing to put in extra hours to take our offering of mythical creatures to the next level. Our solutions are diverse and the things we are building are going to delight our users. 
 
-But first... Unicorn.Rentals needs to deliver it's next generation, cloud hosted, marketing website! As the core team responsibile for the deployment and migration, you'll ship the features that power Unicorn.Rentals new marketing website, and debug any problems that come up when the Unicorns break loose. You'll divide tasks up between your team focused on building new feature flags, creating rollout strategies, and delivering the new website... hopefully with no broken horns! 
+But first... Unicorn.Rentals needs to deliver it's next generation, cloud hosted, marketing website! As the core team responsible for the deployment and migration, you'll ship the features that power Unicorn.Rentals new marketing website, and debug any problems that come up when the Unicorns break loose. You'll divide tasks up between your team focused on building new feature flags, creating rollout strategies, and delivering the new website... hopefully with no broken horns! 
 """
 WELCOME_INDEX=1
 WELCOME_MARKDOWN=True
@@ -22,12 +22,13 @@ The pipelines have ran and its time to deploy our new Unicorn.Rentals into AWS! 
 As the Cloud Administrator at Unicorn.Rentals, you'll need to deploy the image for the website to AWS App Runner. As part of this exercise, ensure the following configurations are applied: 
 
 * Search for `unicornrentalsapp` in the image list, and use this as your image. **NOTE** The actual image name will have additional characters to make sure you have the most unique unicorn image possible.
-* Set the port for the App Runner application to `5000`
-* Create an enviornment variable named `LD_SERVER_KEY`, with the matching Server SDK key values from the credential list (or from within LaunchDarkly). This alllows the server component of your application to render feature flags from LaunchDarkly. The client side SDK is not needed for this step. 
+* For the **ECR access Role** ensure you have selected the `AppRunnerECRAccessRole` from the list
+* Create an environment variable named `LD_SERVER_KEY`, with the matching Server SDK key values from the credential list (or from within LaunchDarkly). This allows the server component of your application to render feature flags from LaunchDarkly. The client side SDK is not needed for this step. 
 * Create an additional environment variable for your **Team ID** named `TEAM_ID` and the TEAM value from your credentials. 
+* Set the port for the App Runner application to `5000`
 * On the security tab, ensure you have selected the **instance role** titled **AppRunnerRole** to allow connectivity to the necessary Unicorn.Rentals cloud resources 
 
-When your deployment is complete and running successfully, enter the full URL (including https://) below and the system will validate if the application is up! 
+When your deployment is complete and running successfully (this may take around 5 minutes), enter the full URL (including https://) below and the system will validate if the application is up! 
 
 **Note: Incorrect submissions will cost you! Ensure the website is fully up before you submit, or you'll lose reputation along with score!**
 """
@@ -68,9 +69,9 @@ TASK1_COMPLETE_MARKDOWN=True
 TASK2_KEY="task2"
 TASK2_LABEL="Task 2 - Releasing the new Unicorn.Rentals!"
 TASK2_VALUE="""
-You just received a notification from the web development team that the new version of the Unicorn.Rentals website is ready for user testing! They have pushed their changed to the site already, but also included a **[feature flag](https://launchdarkly.com/blog/what-are-feature-flags/)** that is preventing it from being seen by most users. as the engineer helping roll out the new site and release the changes, it's now up to you to create a flag in [LaunchDarkly](https://app.launchdarkly.com) that allows users to see the new website. 
+You just received a notification from the web development team that the new version of the Unicorn.Rentals website is ready for user testing! They have pushed their changed to the site already, but also included a **[feature flag](https://launchdarkly.com/blog/what-are-feature-flags/)** that is preventing it from being seen by most users. As the engineer helping roll out the new site and release the changes, it's now up to you to create a flag in [LaunchDarkly](https://app.launchdarkly.com) that allows users to see the new website. 
 
-The development team has included the details for the feature flag to be created in the application code [here](https://github.com/codyde/ld-aws-gameday/blob/a383dbf064d081b841937b27b637519243726470/pages/index.js#L55). Use this infromation to create a feature flag that will release the Unicorn.Rentals website with LaunchDarkly.
+The development team has included the details for the feature flag to be created in the application code [here](https://github.com/codyde/ld-aws-gameday/blob/a383dbf064d081b841937b27b637519243726470/pages/index.js#L55). Use this information to create a feature flag that will release the Unicorn.Rentals website with LaunchDarkly.
 
 Once the [feature flag](https://launchdarkly.com/blog/what-are-feature-flags/) is enabled, you'll be able to access a new API on the `/status` route, which you can use to validate that the correct version of Unicorn.Rentals has launched! We will use this value in the input box below.   
 """
@@ -100,7 +101,7 @@ Your team noticies significant amounts of debug data on the newly released Unico
 
 The development team has placed enhanced logging for both our server and client side behind a feature flag. This allows teams to activate enhanced logging for specific users to help isolate problems. Your team will need to create and manage this feature flag in LaunchDarkly and configure the target to be our `debuguser`.
 
-We will use multiple [variations within LaunchDarkly](https://docs.launchdarkly.com/home/flags/variations) to confiugure different potential values that our feature flags may resolve to. Variations allow LaunchDarkly to serve up multiple different value types based on what version is set to enabled, or what targeting rules you have configured for users or systems.
+We will use multiple [variations within LaunchDarkly](https://docs.launchdarkly.com/home/flags/variations) to configure different potential values that our feature flags may resolve to. Variations allow LaunchDarkly to serve up multiple different value types based on what version is set to enabled, or what targeting rules you have configured for users or systems.
 
 The development team has included comments in the application code around what feature flag configuration should be implemented for this task. You can find the [client-side code here](https://github.com/codyde/ld-aws-gameday/blob/a383dbf064d081b841937b27b637519243726470/pages/index.js#L78) and the [server-side code here](https://github.com/codyde/ld-aws-gameday/blob/a383dbf064d081b841937b27b637519243726470/main.py#L115) (the comments are the same between each - you do not need to use both). Browse the code to find the details, and create the multi-variate feature flag. Create a [targeting rule](https://docs.launchdarkly.com/home/flags/targeting-users) that points at `debuguser`, and enables the **Debug** feature for them, while serving the `default` rule to everyone else. 
 
@@ -134,7 +135,7 @@ TASK3_COMPLETE_MARKDOWN=True
 TASK4_KEY="task4"
 TASK4_LABEL="Task 4 - Time to migrate!"
 TASK4_VALUE="""
-Upon inspection of the debug code, you discover that the data is using the local debug data instead of the database in AWS that the development team intended on being used. Since feature flags allow us to control how code executes, we can use a feature flag to [roll out the database change](https://launchdarkly.com/blog/database-migration-using-launchdarkly/) to the Unicorn.Rentals environment - either gradually, or all at once. Furthermore, if we discover a problem with the database connection - we can disable the feature and return it back to the orginal code in milliseconds (the "kill switch"). 
+Upon inspection of the debug code, you discover that the data is using the local debug data instead of the database in AWS that the development team intended on being used. Since feature flags allow us to control how code executes, we can use a feature flag to [roll out the database change](https://launchdarkly.com/blog/database-migration-using-launchdarkly/) to the Unicorn.Rentals environment - either gradually, or all at once. Furthermore, if we discover a problem with the database connection - we can disable the feature and return it back to the original code in milliseconds (the "kill switch"). 
 
 Just like before, the development team has already staged our code for the database migration, along with the feature flag configuration that needs to be in place. These details can be found [here](https://github.com/codyde/ld-aws-gameday/blob/a383dbf064d081b841937b27b637519243726470/main.py#L182), and will provide you the necessary details for creating the feature flag to control which database is being used. 
 
@@ -153,14 +154,14 @@ TASK4_WRONG_MARKDOWN=True
 
 TASK4_CORRECT_KEY="task4_correct_answer"
 TASK4_CORRECT_LABEL="Look at that, our Unicorns are ALL CLOUDY NOW!"
-TASK4_CORRECT_VALUE="Your migration is successful, you are now returning data to the Unicorn.Rentals UI from AWS DyanamoDB. All in a days work for a Unicorn Admin!"
+TASK4_CORRECT_VALUE="Your migration is successful, you are now returning data to the Unicorn.Rentals UI from AWS DynamoDB. All in a days work for a Unicorn Admin!"
 TASK4_CORRECT_INDEX=43
 TASK4_CORRECT_MARKDOWN=True
 
 
 # QUEST COMPLETE
 QUEST_COMPLETE_KEY='quest_complete'
-QUEST_COMPLETE_LABEL='Youre a Dark Launcher now!'
+QUEST_COMPLETE_LABEL="You're a Dark Launcher now!"
 QUEST_COMPLETE_VALUE='Congratulations! You have successfully created feature flags for several features, used targeting to roll out features to specific users, and even migrated a database - all without redeploying your application once! Great work!'
 QUEST_COMPLETE_INDEX=100
 QUEST_COMPLETE_MARKDOWN=True

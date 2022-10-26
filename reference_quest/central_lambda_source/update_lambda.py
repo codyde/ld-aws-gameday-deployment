@@ -97,6 +97,25 @@ def getMigrationValue(team_data):
         print(f"You haven't migrated")
         return False
 
+def calculate_bonus_points(quests_api_client, quest_id, team_data):
+    quest = quests_api_client.get_quest_for_team(team_data['team-id'], quest_id)
+
+    # Get quest start time
+    start_time = datetime.fromtimestamp(quest['quest-start-time'])
+
+    # Get quest end time, that is, current time
+    end_time = datetime.now()
+
+    # Calculate elapsed time
+    time_diff = end_time - start_time
+    minutes = int(time_diff.total_seconds() / 60)
+
+    # Calculate bonus points based on elapsed time
+    bonus_points = int(scoring_const.QUEST_COMPLETE_POINTS / minutes * scoring_const.QUEST_COMPLETE_MULTIPLIER)
+    print(f"Bonus points on {scoring_const.QUEST_COMPLETE_POINTS} done in {minutes} minutes: {bonus_points}")
+
+    return bonus_points
+
 # This function is triggered by sns_lambda.py whenever the team has provided input via the event UI. It validates
 # the input and performs related operations, such as updating the team's DynamoDB table record or posting a feedback message.
 # Expected event parameters: {'team_id': team_id,'key': key, 'value': value}
@@ -312,23 +331,20 @@ def lambda_handler(event, context):
                 team_data['start-task-3'] = True
                 print("writing updated task2 value")
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
-
-                quests_api_client.delete_input(
-                    team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
-                    key=input_const.TASK2_LAUNCH_KEY
-                )
                 
                 print("Task 2 - Checking for errors and deleting if there is")
                 
-                # Delete Score Lock Ouput here eventually key="task2_score_lock"
+                print("unlocking task2 score lock")
+                team_data['task2-score-locked'] = False
                 
+                print("Trying to delete unlreased error")
                 quests_api_client.delete_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
                     key=output_const.TASK2_UNRELEASED_KEY,
                 )
                 
+                print("Deleting hint")
                 quests_api_client.delete_hint(
                     team_id=team_data["team-id"],
                     quest_id=QUEST_ID, 
@@ -336,6 +352,7 @@ def lambda_handler(event, context):
                     detail=True
                 )
 
+                print("Posting complete output")
                 quests_api_client.post_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
@@ -346,6 +363,8 @@ def lambda_handler(event, context):
                     markdown=output_const.TASK2_COMPLETE_MARKDOWN,
                 )
 
+
+                print("Scoring task 2")
                 quests_api_client.post_score_event(
                     team_id=team_data["team-id"],
                     quest_id=QUEST_ID,
@@ -376,15 +395,7 @@ def lambda_handler(event, context):
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
                     key="task2_score_lock",
-                    )
-
-                # TASK3_KEY="task3"
-                # TASK3_LABEL="Task 3 - Uh, we've got a problem here. This data looks off."
-                # TASK3_VALUE="""
-                # Your team noticies significant amounts of debug data on the newly released Unicorn.Rentals site. You could quickly toggle off the feature flag to remove the problem website from view, but the team included a special feature flag in the code to assist with enabling the administrative debug menu. Your team will need to create a new feature flag in LaunchDarkly to enable this menu, but since we only want this menu displayed for specific users - we'll need to create a targeting rule to isolate access to only a specific individual.
-                # """
-                # TASK3_INDEX=30
-                # TASK3_MARKDOWN=True
+                )
 
             else: 
                 print("resetting app-version")
@@ -582,6 +593,36 @@ def lambda_handler(event, context):
 
                 team_data['task4-score-locked'] = False
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
+
+                quests_api_client.post_score_event(
+                    team_id=team_data["team-id"],
+                    quest_id=QUEST_ID,
+                    description=scoring_const.QUEST_COMPLETE_DESC,
+                    points=scoring_const.QUEST_COMPLETE_POINTS
+                )
+
+                # Award quest complete bonus points
+                bonus_points = calculate_bonus_points(quests_api_client, quest_id, team_data)
+                quests_api_client.post_score_event(
+                    team_id=team_data["team-id"],
+                    quest_id=QUEST_ID,
+                    description=scoring_const.QUEST_COMPLETE_BONUS_DESC,
+                    points=bonus_points
+                )
+
+                # Post quest complete message
+                quests_api_client.post_output(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=output_const.QUEST_COMPLETE_KEY,
+                    label=output_const.QUEST_COMPLETE_LABEL,
+                    value=output_const.QUEST_COMPLETE_VALUE,
+                    dashboard_index=output_const.QUEST_COMPLETE_INDEX,
+                    markdown=output_const.QUEST_COMPLETE_MARKDOWN,
+                )
+
+                # Complete quest
+                quests_api_client.post_quest_complete(team_id=team_data['team-id'], quest_id=quest_id)
 
             else:
 
