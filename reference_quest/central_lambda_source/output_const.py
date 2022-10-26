@@ -37,7 +37,7 @@ TASK1_MARKDOWN=True
 # TASK 1 - For outputting LD credentials
 TASK1_CREDS_KEY="task1_creds"
 TASK1_CREDS_VALUE="### Use the following credentials:"
-TASK1_CREDS_INDEX=10
+TASK1_CREDS_INDEX=2
 TASK1_CREDS_MARKDOWN=True
 
 TASK1_APPRUNNER_WRONG_KEY="task1_bad_url"
@@ -86,7 +86,7 @@ TASK2_UNRELEASED_MARKDOWN=True
 TASK2_COMPLETE_KEY="task2_complete"
 TASK2_COMPLETE_LABEL="The new Unicorn.Rentals is **LIVE** for user traffic!"
 TASK2_COMPLETE_VALUE="""
-Toggling the feature flag on for `SiteRelease` has enabled the new version of the Unicorn.Rentals website, however, something looks wrong. You can see debug messages reflected in the card views on the main page. Looks like it's time to dig in and figure out what went wrong!
+Toggling the feature flag on for `siteRelease` has enabled the new version of the Unicorn.Rentals website, however, something looks wrong. You can see debug messages reflected in the card views on the main page. Looks like it's time to dig in and figure out what went wrong!
 """
 TASK2_COMPLETE_INDEX=29
 TASK2_COMPLETE_MARKDOWN=True
@@ -137,6 +137,8 @@ TASK4_VALUE="""
 Upon inspection of the debug code, you discover that the data is using the local debug data instead of the database in AWS that the development team intended on being used. Since feature flags allow us to control how code executes, we can use a feature flag to [roll out the database change](https://launchdarkly.com/blog/database-migration-using-launchdarkly/) to the Unicorn.Rentals environment - either gradually, or all at once. Furthermore, if we discover a problem with the database connection - we can disable the feature and return it back to the orginal code in milliseconds (the "kill switch"). 
 
 Just like before, the development team has already staged our code for the database migration, along with the feature flag configuration that needs to be in place. These details can be found [here](https://github.com/codyde/ld-aws-gameday/blob/a383dbf064d081b841937b27b637519243726470/main.py#L182), and will provide you the necessary details for creating the feature flag to control which database is being used. 
+
+After the feature flag is enabled for `dbDetails`, navigate to the `/health` endpoint to determine if Unicorn.Rentals is operating on the migrated cloud database. 
 """
 TASK4_INDEX=40
 TASK4_MARKDOWN=True
