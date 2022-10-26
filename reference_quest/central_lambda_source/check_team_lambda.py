@@ -289,16 +289,6 @@ def evaluate_release(quests_api_client, team_data):
             detail=True
         )
 
-        quests_api_client.post_output(
-            team_id=team_data['team-id'],
-            quest_id=QUEST_ID,
-            key=output_const.TASK2_COMPLETE_KEY,
-            label=output_const.TASK2_COMPLETE_LABEL,
-            value=output_const.TASK2_COMPLETE_VALUE,
-            dashboard_index=output_const.TASK2_COMPLETE_INDEX,
-            markdown=output_const.TASK2_COMPLETE_MARKDOWN,
-        )
-
         # quests_api_client.post_score_event(
         #     team_id=team_data["team-id"],
         #     quest_id=QUEST_ID,
