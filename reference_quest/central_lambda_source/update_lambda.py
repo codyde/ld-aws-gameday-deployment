@@ -622,7 +622,7 @@ def lambda_handler(event, context):
                 )
 
                 # Complete quest
-                quests_api_client.post_quest_complete(team_id=team_data['team-id'], quest_id=quest_id)
+                quests_api_client.post_quest_complete(team_id=team_data['team-id'], quest_id=QUEST_ID)
 
             else:
 
