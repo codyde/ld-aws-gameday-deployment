@@ -98,7 +98,7 @@ def getMigrationValue(team_data):
         return False
 
 def calculate_bonus_points(quests_api_client, quest_id, team_data):
-    quest = quests_api_client.get_quest_for_team(team_data['team-id'], quest_id)
+    quest = quests_api_client.get_quest_for_team(team_data['team-id'], QUEST_ID)
 
     # Get quest start time
     start_time = datetime.fromtimestamp(quest['quest-start-time'])
