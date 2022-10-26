@@ -274,27 +274,7 @@ def evaluate_release(quests_api_client, team_data):
             print("Task not started yet - doing nothing")
     else:
 
-        # Delete error and hint if they still exist 
-
-        quests_api_client.delete_output(
-            team_id=team_data['team-id'],
-            quest_id=QUEST_ID,
-            key=output_const.TASK2_UNRELEASED_KEY,
-        )
-        
-        quests_api_client.delete_hint(
-            team_id=team_data["team-id"],
-            quest_id=QUEST_ID, 
-            hint_key=hint_const.TASK2_HINT1_KEY,
-            detail=True
-        )
-
-        # quests_api_client.post_score_event(
-        #     team_id=team_data["team-id"],
-        #     quest_id=QUEST_ID,
-        #     description=scoring_const.COMPLETE_DESC,
-        #     points=scoring_const.COMPLETE_POINTS
-        # )
+        print("Website is released")
 
 
     return team_data
