@@ -28,11 +28,19 @@ TASK2_HINT1_COST=200
 
 # TASK 3 HINTS
 TASK3_HINT1_KEY="task3_hint1"
-TASK3_HINT1_LABEL="Having difficulty rotating the user's credentials"
+TASK3_HINT1_LABEL="Having a hard time with the right flag configuration?"
 TASK3_HINT1_DESCRIPTION="If you're stuck, click on the Reveal Hint button to get some guidance"
 TASK3_HINT1_VALUE="""
-Ensure that you have navigated to your team's AWS Console. Then click on 'Services' in the upper left and find 'IAM'.
-Then. locate the 'Developer' user and... do we need to tell you everything?
+This is going to be a string flag, with 2 different values. The code links above will show you that the flag values should be `debug` (variation 1, the On value by default) and `default` (variation 2, the Off value by default)
 """
 TASK3_HINT1_INDEX=37
 TASK3_HINT1_COST=200
+
+TASK4_HINT1_KEY="task4_hint1"
+TASK4_HINT1_LABEL="Not able to migrate the database connectivity?"
+TASK4_HINT1_DESCRIPTION="If you're stuck, click on the Reveal Hint button to get some guidance"
+TASK4_HINT1_VALUE="""
+The feature flag is a JSON based feature flag with values for the database host type, database name, and mode. Ensure you've formatted it properly as per the code in the description text.
+"""
+TASK4_HINT1_INDEX=47
+TASK4_HINT1_COST=200

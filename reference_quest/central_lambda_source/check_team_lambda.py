@@ -63,7 +63,7 @@ def lambda_handler(event, context):
     team_data = evaluate_debug_mode(quests_api_client, team_data)
 
     # Task 4 evaluation
-    # team_data = evaluate_final_answer(quests_api_client, team_data)
+    team_data = evaluate_db_migration(quests_api_client, team_data)
 
     # Complete quest if everything is done
     check_and_complete_quest(quests_api_client, QUEST_ID, team_data)
@@ -110,26 +110,6 @@ def evaluate_apprunner(quests_api_client, team_data):
             else: 
                 print(f"The web application for team {team_data['team-id']} is UP")
                 
-                quests_api_client.post_score_event(
-                    team_id=team_data["team-id"],
-                    quest_id=QUEST_ID,
-                    description=scoring_const.CORRECT_APPRUNNER_DESC,
-                    points=scoring_const.CORRECT_APPRUNNER_POINTS
-                )
-                
-                # Delete app down message if present
-                quests_api_client.delete_output(
-                    team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
-                    key=output_const.TASK1_APPRUNNER_DOWN_KEY
-                )
-
-                quests_api_client.delete_output(
-                    team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
-                    key=output_const.TASK1_APPRUNNER_WRONG_KEY
-                )      
-
             # Award points if web app is up else detract points if down
             # Complete task if chaos event had started and web app is up
                 if team_data['is-webapp-up'] and not team_data['start-task-2'] and not team_data['is-apprunner-done']:
@@ -150,57 +130,8 @@ def evaluate_apprunner(quests_api_client, team_data):
                     if response['statusCode'] != 200:
                         print(response)
 
-                    # Post task final message
-                    quests_api_client.post_output(
-                        team_id=team_data['team-id'],
-                        quest_id=QUEST_ID,
-                        key=output_const.TASK1_COMPLETE_KEY,
-                        label=output_const.TASK1_COMPLETE_LABEL,
-                        value=output_const.TASK1_COMPLETE_VALUE,
-                        dashboard_index=output_const.TASK1_COMPLETE_INDEX,
-                        markdown=output_const.TASK1_COMPLETE_MARKDOWN,
-                    )
-                    # Award final points
-                    quests_api_client.post_score_event(
-                        team_id=team_data["team-id"],
-                        quest_id=QUEST_ID,
-                        description=scoring_const.TASK1_COMPLETE_DESC,
-                        points=scoring_const.TASK1_COMPLETE_POINTS
-                    )
-
                     # Prepare for Task 2 Post task 2 instructions
-                    image_url = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}curl.jpeg",signed_duration=86400)
-
-                    quests_api_client.post_output(
-                        team_id=team_data['team-id'],
-                        quest_id=QUEST_ID,
-                        key=output_const.TASK2_KEY,
-                        label=output_const.TASK2_LABEL,
-                        value=output_const.TASK2_VALUE.format(image_url),
-                        dashboard_index=output_const.TASK2_INDEX,
-                        markdown=output_const.TASK2_MARKDOWN,
-                    )
-
-                    quests_api_client.post_input(
-                        team_id=team_data['team-id'],
-                        quest_id=QUEST_ID,
-                        key=input_const.TASK2_LAUNCH_KEY,
-                        label=input_const.TASK2_LAUNCH_LABEL,
-                        description=input_const.TASK2_LAUNCH_DESCRIPTION,
-                        dashboard_index=input_const.TASK2_LAUNCH_INDEX
-                    )
-
-                    quests_api_client.post_hint(
-                        team_id=team_data['team-id'],
-                        quest_id=QUEST_ID,
-                        hint_key=hint_const.TASK2_HINT1_KEY,
-                        label=hint_const.TASK2_HINT1_LABEL,
-                        description=hint_const.TASK2_HINT1_DESCRIPTION,
-                        value=hint_const.TASK1_HINT2_VALUE,
-                        dashboard_index=hint_const.TASK2_HINT1_INDEX,
-                        cost=hint_const.TASK1_HINT2_COST,
-                        status=hint_const.STATUS_OFFERED
-                    )
+                    print("Starting Task 2")
     else: 
         if not team_data['start-task-2'] and not team_data['is-apprunner-done']:
             print("Setting is-apprunner-done to True")
@@ -208,6 +139,74 @@ def evaluate_apprunner(quests_api_client, team_data):
             print("Setting start-task-2 to True")
             team_data['start-task-2'] = True
             dynamodb_utils.save_team_data(team_data, quest_team_status_table)
+
+            quests_api_client.delete_output(
+                    team_id=team_data["team-id"],
+                    quest_id=QUEST_ID, 
+                    key=output_const.TASK1_APPRUNNER_DOWN_KEY
+                )
+
+            quests_api_client.delete_hint(
+                team_id=team_data["team-id"],
+                quest_id=QUEST_ID, 
+                hint_key=hint_const.TASK1_HINT1_KEY,
+                detail=True
+            )
+
+            quests_api_client.post_output(
+                team_id=team_data['team-id'],
+                quest_id=QUEST_ID,
+                key=output_const.TASK1_COMPLETE_KEY,
+                label=output_const.TASK1_COMPLETE_LABEL,
+                value=output_const.TASK1_COMPLETE_VALUE,
+                dashboard_index=output_const.TASK1_COMPLETE_INDEX,
+                markdown=output_const.TASK1_COMPLETE_MARKDOWN,
+            )
+            
+            # Stage Task 2 Things
+
+            quests_api_client.post_input(
+                team_id=team_data['team-id'],
+                quest_id=QUEST_ID,
+                key=input_const.TASK2_LAUNCH_KEY,
+                label=input_const.TASK2_LAUNCH_LABEL,
+                description=input_const.TASK2_LAUNCH_DESCRIPTION,
+                dashboard_index=input_const.TASK2_LAUNCH_INDEX,
+                markdown=True
+            )
+
+            # image_url = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}curl.jpeg",signed_duration=86400)
+
+            quests_api_client.post_output(
+                team_id=team_data['team-id'],
+                quest_id=QUEST_ID,
+                key=output_const.TASK2_KEY,
+                label=output_const.TASK2_LABEL,
+                value=output_const.TASK2_VALUE,
+                dashboard_index=output_const.TASK2_INDEX,
+                markdown=output_const.TASK2_MARKDOWN,
+            )
+
+            quests_api_client.post_input(
+                team_id=team_data['team-id'],
+                quest_id=QUEST_ID,
+                key=input_const.TASK2_LAUNCH_KEY,
+                label=input_const.TASK2_LAUNCH_LABEL,
+                description=input_const.TASK2_LAUNCH_DESCRIPTION,
+                dashboard_index=input_const.TASK2_LAUNCH_INDEX
+            )
+
+            quests_api_client.post_hint(
+                team_id=team_data['team-id'],
+                quest_id=QUEST_ID,
+                hint_key=hint_const.TASK2_HINT1_KEY,
+                label=hint_const.TASK2_HINT1_LABEL,
+                description=hint_const.TASK2_HINT1_DESCRIPTION,
+                value=hint_const.TASK1_HINT2_VALUE,
+                dashboard_index=hint_const.TASK2_HINT1_INDEX,
+                cost=hint_const.TASK1_HINT2_COST,
+                status=hint_const.STATUS_OFFERED
+            )
 
             response = quests_api_client.delete_hint(
                 team_id=team_data['team-id'],
@@ -224,15 +223,6 @@ def evaluate_apprunner(quests_api_client, team_data):
 
             # Post task final message
             print("posting final message")
-            quests_api_client.post_output(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                key=output_const.TASK1_COMPLETE_KEY,
-                label=output_const.TASK1_COMPLETE_LABEL,
-                value=output_const.TASK1_COMPLETE_VALUE,
-                dashboard_index=output_const.TASK1_COMPLETE_INDEX,
-                markdown=output_const.TASK1_COMPLETE_MARKDOWN,
-            )
 
     return team_data
 
@@ -266,37 +256,6 @@ def evaluate_release(quests_api_client, team_data):
         if team_data['start-task-2'] == True:
             print("start-task-2 is True")
 
-            quests_api_client.post_output(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                key=output_const.TASK2_KEY,
-                label=output_const.TASK2_LABEL,
-                value=output_const.TASK2_VALUE.format(image_url),
-                dashboard_index=output_const.TASK2_INDEX,
-                markdown=output_const.TASK2_MARKDOWN,
-            )
-
-            quests_api_client.post_input(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                key=input_const.TASK2_LAUNCH_KEY,
-                label=input_const.TASK2_LAUNCH_LABEL,
-                description=input_const.TASK2_LAUNCH_DESCRIPTION,
-                dashboard_index=input_const.TASK2_LAUNCH_INDEX
-            )
-
-            quests_api_client.post_hint(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                hint_key=hint_const.TASK2_HINT1_KEY,
-                label=hint_const.TASK2_HINT1_LABEL,
-                description=hint_const.TASK2_HINT1_DESCRIPTION,
-                value=hint_const.TASK2_HINT1_VALUE,
-                dashboard_index=hint_const.TASK2_HINT1_INDEX,
-                cost=hint_const.TASK2_HINT1_COST,
-                status=hint_const.STATUS_OFFERED
-            )
-
             if team_data['app-version'] == 'unknown': # True
                 release_version = getAppRelease(team_data)
 
@@ -305,63 +264,12 @@ def evaluate_release(quests_api_client, team_data):
 
                     team_data['is-website-released'] = True
                     dynamodb_utils.save_team_data(team_data, quest_team_status_table)
-                    
-                    quests_api_client.post_output(
-                        team_id=team_data['team-id'],
-                        quest_id=QUEST_ID,
-                        key=output_const.TASK2_COMPLETE_KEY,
-                        label=output_const.TASK2_COMPLETE_LABEL,
-                        value=output_const.TASK2_COMPLETE_VALUE,
-                        dashboard_index=output_const.TASK2_COMPLETE_INDEX,
-                        markdown=output_const.TASK2_COMPLETE_MARKDOWN,
-                    )
-
-                    quests_api_client.post_score_event(
-                        team_id=team_data["team-id"],
-                        quest_id=QUEST_ID,
-                        description=scoring_const.COMPLETE_DESC,
-                        points=scoring_const.COMPLETE_POINTS
-                    )
-
-                    quests_api_client.delete_output(
-                        team_id=team_data["team-id"],
-                        quest_id=QUEST_ID, 
-                        key=output_const.TASK2_UNRELEASED_KEY
-                    )
-
-                    quests_api_client.delete_hint(
-                        team_id=team_data['team-id'],
-                        quest_id=QUEST_ID,
-                        hint_key=hint_const.TASK2_HINT1_KEY,
-                        detail=True
-                    )
-
-                    quests_api_client.delete_output(
-                        team_id=team_data['team-id'],
-                        quest_id=QUEST_ID,
-                        key="task2_score_lock",
-                    )
 
                     # TODO BUILD A HINT HERE FOR THE DEBUG CODE SECTION - SOLVE THE
                     
                 else:
                     print(f"The preview site is still displaying")
-                    # quests_api_client.post_score_event(
-                    #     team_id=team_data["team-id"],
-                    #     quest_id=QUEST_ID,
-                    #     description=scoring_const.UNRELEASED_DESC,
-                    #     points=scoring_const.UNRELEASED_POINTS
-                    # )
 
-                    # quests_api_client.post_output(
-                    #     team_id=team_data['team-id'],
-                    #     quest_id=QUEST_ID,
-                    #     key=output_const.TASK2_UNRELEASED_KEY,
-                    #     label=output_const.TASK2_UNRELEASED_LABEL,
-                    #     value=output_const.TASK2_UNRELEASED_VALUE,
-                    #     dashboard_index=output_const.TASK2_UNRELEASED_INDEX,
-                    #     markdown=output_const.TASK2_MARKDOWN,
-                    # )
         else:
             print("Task not started yet - doing nothing")
     else:
@@ -391,12 +299,12 @@ def evaluate_release(quests_api_client, team_data):
             markdown=output_const.TASK2_COMPLETE_MARKDOWN,
         )
 
-        quests_api_client.post_score_event(
-            team_id=team_data["team-id"],
-            quest_id=QUEST_ID,
-            description=scoring_const.COMPLETE_DESC,
-            points=scoring_const.COMPLETE_POINTS
-        )
+        # quests_api_client.post_score_event(
+        #     team_id=team_data["team-id"],
+        #     quest_id=QUEST_ID,
+        #     description=scoring_const.COMPLETE_DESC,
+        #     points=scoring_const.COMPLETE_POINTS
+        # )
 
 
     return team_data
@@ -453,35 +361,38 @@ def evaluate_debug_mode(quests_api_client, team_data):
 
 # Task 4 - The ultimate answer
 # The actual evaluation happens in Update Lambda. Here is the logic to enable the task
-def evaluate_final_answer(quests_api_client, team_data):
+def evaluate_db_migration(quests_api_client, team_data):
+    print(f"Evaluating Task 4 for {team_data['team-id']}")
+
+    if team_data['start-task-4'] == True and not team_data['is-db-migrated'] and not team_data['task4-score-locked']:
+        print(f"Task 4 logic starts for {team_data['team-id']}")
+
+        if team_data['migration-location'] == 'unknown':
 
     # Enable this task as soon as the team completed all the other tasks
-    if (team_data['is-apprunner-done']           # Task 1
-        and team_data['is-cloudshell-launched']         # Task 2
-        and team_data['is-accesskey-rotated']           # Task 3
-        and not team_data['is-final-task-enabled']):    # Task 4 (this task not yet enabled)
+            if (team_data['is-apprunner-done']           # Task 1
+                and team_data['is-website-released']         # Task 2
+                and team_data['is-debug-mode']           # Task 3
+                and not team_data['is-db-migrated']):    # Task 4 (this task not yet enabled)
 
-        # Switch flag
-        team_data['is-final-task-enabled'] = True
+                # Switch flag
+                team_data['start-task-4'] = True
 
-        # Post Task 4 instructions
-        quests_api_client.post_output(
-            team_id=team_data['team-id'],
-            quest_id=QUEST_ID,
-            key=output_const.TASK4_KEY,
-            label=output_const.TASK4_LABEL,
-            value=output_const.TASK4_VALUE,
-            dashboard_index=output_const.TASK4_INDEX,
-            markdown=output_const.TASK4_MARKDOWN,
-        )
-        quests_api_client.post_input(
-            team_id=team_data['team-id'],
-            quest_id=QUEST_ID,
-            key=input_const.TASK4_KEY,
-            label=input_const.TASK4_LABEL,
-            description=input_const.TASK4_DESCRIPTION,
-            dashboard_index=input_const.TASK4_INDEX
-        )
+                # Post Task 4 instructions
+                quests_api_client.post_output(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=output_const.TASK4_KEY,
+                    label=output_const.TASK4_LABEL,
+                    value=output_const.TASK4_VALUE,
+                    dashboard_index=output_const.TASK4_INDEX,
+                    markdown=output_const.TASK4_MARKDOWN,
+                )
+        else:
+            print("Task 4 - Conditions for execution not met")
+
+    else:
+        print("Task 3 not ready to be evaluated yet")
 
     return team_data
 
@@ -493,7 +404,7 @@ def check_and_complete_quest(quests_api_client, quest_id, team_data):
     if (team_data['is-webapp-up']           # Task 1
         and team_data['is-website-released']         # Task 2
         and team_data['is-debug-mode']           # Task 3
-        and team_data['is-answer-to-life-correct']):    # Task 4
+        and team_data['is-db-migrated']):    # Task 4
 
         # Award quest complete points
         print(f"Team {team_data['team-id']} has completed this quest, posting output and awarding points")

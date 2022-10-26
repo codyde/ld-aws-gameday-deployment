@@ -33,7 +33,6 @@ Parameters:
     Default: Archive.zip
     Description: S3 key for the dummy zip file containing the buildspec_prod.yml and dockerfile
     Type: String
-# TODO - Evaluate if this should be as static as it is - will this collide with other users? It won't if they have their own individual accounts
   AppRepoName:
     Default: 'app-gameday-ld'
     Description: Gameday Repo Name
@@ -139,18 +138,6 @@ Resources:
             - !Ref TeamLambdaSourceKey
       Role: !GetAtt LambdaRole.Arn
 
-  # ResourceLookup:
-  #   Type: Custom::ResourceLookup
-  #   Properties:
-  #     ServiceToken: !GetAtt ResourceLookupLambda.Arn
-
-  # DeveloperUser:
-  #   Type: 'AWS::IAM::User'
-  #   Properties:
-  #       UserName: ReferenceDeveloper
-  #       ManagedPolicyArns:
-  #          - 'arn:aws:iam::aws:policy/AdministratorAccess'
-
   InitFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -167,9 +154,8 @@ Resources:
             data = table.put_item(
             TableName='GamedayDB',
             Item={
-                'teamid': '1',
-                'debugcode': 'pants',
-                'teamval': '123-abc',
+                'teamid': os.environ['TABLENUMBER'],
+                'debugcode': '1100101',
                 'title1':'Unicorn with Confidence',
                 'text1':'Because you can always be confident when Unicorn.Rentals is providing your Unicorn.',
                 'title2':'Mythically Reliabile',
@@ -188,7 +174,9 @@ Resources:
               },
             }
             cfnresponse.send(event, context, cfnresponse.SUCCESS, response) 
-
+      Environment:
+        Variables:
+          TABLENUMBER: !Ref TeamTableSsmParam
       Handler: index.handler
       Role:
         Fn::GetAtt: [ LambdaRole , "Arn" ]

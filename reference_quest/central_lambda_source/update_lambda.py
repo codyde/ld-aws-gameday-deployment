@@ -13,6 +13,7 @@ import output_const
 import scoring_const
 import hint_const
 import http.client
+import ui_utils
 from aws_gameday_quests.gdQuestsApi import GameDayQuestsApiClient
 
 # Standard AWS GameDay Quests Environment Variables
@@ -20,6 +21,8 @@ QUEST_ID = os.environ['QUEST_ID']
 QUEST_API_BASE = os.environ['QUEST_API_BASE']
 QUEST_API_TOKEN = os.environ['QUEST_API_TOKEN']
 GAMEDAY_REGION = os.environ['GAMEDAY_REGION']
+# ASSETS_BUCKET = os.environ['ASSETS_BUCKET']
+# ASSETS_BUCKET_PREFIX = os.environ['ASSETS_BUCKET_PREFIX']
 
 # Quest Environment Variables
 QUEST_TEAM_STATUS_TABLE = os.environ['QUEST_TEAM_STATUS_TABLE']
@@ -75,6 +78,23 @@ def getDebugValue(team_data):
             raise Exception(f"The debug code is invalid")
     except Exception as e:
         print(f"The version does not match")
+        return False
+
+def getMigrationValue(team_data):
+    try:
+        print(f"Getting debug value via the /teamdebug API")
+        conn = http.client.HTTPSConnection(team_data['app-runner-url'].strip('https://'), timeout=5)
+        conn.request("GET", "/health")
+        res = conn.getresponse()
+        string = res.read().decode('utf-8')
+        dataResp = json.loads(string)
+        print(dataResp['location'])
+        if dataResp['location'] == team_data['migration-location']:
+            return True
+        else:
+            raise Exception(f"The migration location is invalid")
+    except Exception as e:
+        print(f"You haven't migrated")
         return False
 
 # This function is triggered by sns_lambda.py whenever the team has provided input via the event UI. It validates
@@ -144,12 +164,6 @@ def lambda_handler(event, context):
                 quests_api_client.delete_output(
                     team_id=team_data["team-id"],
                     quest_id=QUEST_ID, 
-                    key=output_const.TASK1_APPRUNNER_DOWN_KEY
-                )
-
-                quests_api_client.delete_output(
-                    team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
                     key=output_const.TASK1_APPRUNNER_WRONG_KEY
                 )
 
@@ -160,6 +174,16 @@ def lambda_handler(event, context):
                     detail=True
                 )
 
+                quests_api_client.post_output(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=output_const.TASK1_COMPLETE_KEY,
+                    label=output_const.TASK1_COMPLETE_LABEL,
+                    value=output_const.TASK1_COMPLETE_VALUE,
+                    dashboard_index=output_const.TASK1_COMPLETE_INDEX,
+                    markdown=output_const.TASK1_COMPLETE_MARKDOWN,
+                )
+                
                 # Stage Task 2 Things
 
                 quests_api_client.post_input(
@@ -168,7 +192,40 @@ def lambda_handler(event, context):
                     key=input_const.TASK2_LAUNCH_KEY,
                     label=input_const.TASK2_LAUNCH_LABEL,
                     description=input_const.TASK2_LAUNCH_DESCRIPTION,
+                    dashboard_index=input_const.TASK2_LAUNCH_INDEX,
+                )
+
+                # image_url = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}curl.jpeg",signed_duration=86400)
+
+                quests_api_client.post_output(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=output_const.TASK2_KEY,
+                    label=output_const.TASK2_LABEL,
+                    value=output_const.TASK2_VALUE,
+                    dashboard_index=output_const.TASK2_INDEX,
+                    markdown=output_const.TASK2_MARKDOWN,
+                )
+
+                quests_api_client.post_input(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=input_const.TASK2_LAUNCH_KEY,
+                    label=input_const.TASK2_LAUNCH_LABEL,
+                    description=input_const.TASK2_LAUNCH_DESCRIPTION,
                     dashboard_index=input_const.TASK2_LAUNCH_INDEX
+                )
+
+                quests_api_client.post_hint(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    hint_key=hint_const.TASK2_HINT1_KEY,
+                    label=hint_const.TASK2_HINT1_LABEL,
+                    description=hint_const.TASK2_HINT1_DESCRIPTION,
+                    value=hint_const.TASK1_HINT2_VALUE,
+                    dashboard_index=hint_const.TASK2_HINT1_INDEX,
+                    cost=hint_const.TASK1_HINT2_COST,
+                    status=hint_const.STATUS_OFFERED
                 )
 
             else: 
@@ -297,22 +354,28 @@ def lambda_handler(event, context):
                 )
 
                 quests_api_client.post_input(
-                        team_id=team_data['team-id'],
-                        quest_id=QUEST_ID,
-                        key=input_const.TASK3_DEBUG_KEY,
-                        label=input_const.TASK3_DEBUG_LABEL,
-                        description=input_const.TASK3_DEBUG_DESCRIPTION,
-                        dashboard_index=input_const.TASK3_DEBUG_INDEX
-                    )
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=input_const.TASK3_DEBUG_KEY,
+                    label=input_const.TASK3_DEBUG_LABEL,
+                    description=input_const.TASK3_DEBUG_DESCRIPTION,
+                    dashboard_index=input_const.TASK3_DEBUG_INDEX
+                )
 
                 quests_api_client.post_output(
-                        team_id=team_data['team-id'],
-                        quest_id=QUEST_ID,
-                        key=output_const.TASK3_KEY,
-                        label=output_const.TASK3_LABEL,
-                        value=output_const.TASK3_VALUE,
-                        dashboard_index=output_const.TASK3_INDEX,
-                        markdown=output_const.TASK3_COMPLETE_MARKDOWN,
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=output_const.TASK3_KEY,
+                    label=output_const.TASK3_LABEL,
+                    value=output_const.TASK3_VALUE,
+                    dashboard_index=output_const.TASK3_INDEX,
+                    markdown=output_const.TASK3_COMPLETE_MARKDOWN,
+                )
+
+                quests_api_client.delete_output(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key="task2_score_lock",
                     )
 
                 # TASK3_KEY="task3"
@@ -390,6 +453,13 @@ def lambda_handler(event, context):
             team_data['debugcode'] = input_value
             debugstatus = getDebugValue(team_data)
             if debugstatus:
+
+                quests_api_client.delete_output(
+                        team_id=team_data['team-id'],
+                        quest_id=QUEST_ID,
+                        key=output_const.TASK3_INCORRECT_KEY,
+                    )
+
                 quests_api_client.post_output(
                         team_id=team_data['team-id'],
                         quest_id=QUEST_ID,
@@ -407,12 +477,46 @@ def lambda_handler(event, context):
                         points=scoring_const.DEBUG_RIGHT_POINTS
                     )
                 team_data['is-debug-mode'] = True
+
+                # Post Task 4 info
+
+                quests_api_client.post_output(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=output_const.TASK4_KEY,
+                    label=output_const.TASK4_LABEL,
+                    value=output_const.TASK4_VALUE,
+                    dashboard_index=output_const.TASK4_INDEX,
+                    markdown=output_const.TASK4_MARKDOWN,
+                )
+
+                quests_api_client.post_input(
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=input_const.TASK4_MIGRATION_KEY,
+                    label=input_const.TASK4_MIGRATION_LABEL,
+                    description=input_const.TASK4_MIGRATION_DESCRIPTION,
+                    dashboard_index=input_const.TASK4_MIGRATION_INDEX
+                )
+
+
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
             else:
                 print("Value was wrong - setting reset sequence") 
                 print("Removing score lock for Task 3")
                 team_data['task3-score-locked'] = False
                 team_data['debugCode'] = 'unknown'
+                
+                quests_api_client.post_output(
+                        team_id=team_data['team-id'],
+                        quest_id=QUEST_ID,
+                        key=output_const.TASK3_INCORRECT_KEY,
+                        label=output_const.TASK3_INCORRECT_LABEL,
+                        value=output_const.TASK3_INCORRECT_VALUE,
+                        dashboard_index=output_const.TASK3_INCORRECT_INDEX,
+                        markdown=output_const.TASK3_INCORRECT_MARKDOWN,
+                    )
+
                 quests_api_client.post_input(
                         team_id=team_data['team-id'],
                         quest_id=QUEST_ID,
@@ -435,77 +539,85 @@ def lambda_handler(event, context):
             print(f"Error while handling team update request: {err}")
 
 
-    # Task 4 evaluation
-    elif event['key'] == input_const.TASK4_KEY:
+    # Task 4 - DB Migration
+    elif event['key'] == input_const.TASK4_MIGRATION_KEY and not team_data['is-db-migrated'] and not team_data['task4-score-locked']:
+        try:
+            # Check team's input value
+            team_data['task4-score-locked'] = True
+            quests_api_client.delete_input(
+                        team_id=team_data["team-id"],
+                        quest_id=QUEST_ID, 
+                        key=input_const.TASK4_MIGRATION_KEY
+                    )
+            value = event['value']
+            team_data['migration-location'] = value
+            migrated = getMigrationValue(team_data)
+            if migrated == True:
 
-        # Check team's input value
-        value = event['value'].strip().lower()
-        if value in input_const.TASK4_KEY_CORRECT_ANSWERS:
+                # Delete error if it exists 
+                team_data['is-db-migrated'] = True
 
-            # Correct answer - switch flag to true
-            team_data['is-answer-to-life-correct'] = True
+                quests_api_client.delete_output(
+                            team_id=team_data['team-id'],
+                            quest_id=QUEST_ID,
+                            key=output_const.TASK4_WRONG_KEY,
+                        )
 
-            try:
-                # First update DynamoDB to avoid race conditions, then do the rest on success
+                quests_api_client.post_score_event(
+                            team_id=team_data["team-id"],
+                            quest_id=QUEST_ID,
+                            description=scoring_const.MIGRATION_SUCCESS_DESC,
+                            points=scoring_const.MIGRATION_SUCCESS_POINTS
+                        )
+
+                quests_api_client.post_output(
+                            team_id=team_data['team-id'],
+                            quest_id=QUEST_ID,
+                            key=output_const.TASK4_CORRECT_KEY,
+                            label=output_const.TASK4_CORRECT_LABEL,
+                            value=output_const.TASK4_CORRECT_VALUE,
+                            dashboard_index=output_const.TASK4_CORRECT_INDEX,
+                            markdown=output_const.TASK4_CORRECT_MARKDOWN,
+                        )
+
+                team_data['task4-score-locked'] = False
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
 
-                # Delete previous error if present
-                quests_api_client.delete_output(
-                    team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
-                    key=output_const.TASK4_WRONG_KEY
-                )
+            else:
 
-                # Delete input since cannot be updated as task can be started only once
-                quests_api_client.delete_input(
-                    team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
-                    key=input_const.TASK4_KEY
-                )
-
-                # Post output
-                quests_api_client.post_output(
-                    team_id=team_data['team-id'],
-                    quest_id=QUEST_ID,
-                    key=output_const.TASK4_CORRECT_KEY,
-                    label=output_const.TASK4_CORRECT_LABEL,
-                    value=output_const.TASK4_CORRECT_VALUE,
-                    dashboard_index=output_const.TASK4_CORRECT_INDEX,
-                    markdown=output_const.TASK4_CORRECT_MARKDOWN,
-                )
-
-                # Award points
                 quests_api_client.post_score_event(
-                    team_id=team_data["team-id"],
-                    quest_id=QUEST_ID,
-                    description=scoring_const.THE_ANSWER_CORRECT_DESC,
-                    points=scoring_const.THE_ANSWER_CORRECT_POINTS
-                )
+                            team_id=team_data["team-id"],
+                            quest_id=QUEST_ID,
+                            description=scoring_const.MIGRATION_FAILED_DESC,
+                            points=scoring_const.MIGRATION_FAILED_POINTS
+                        )
 
-            except Exception as err:
-                print(f"Error while handling team update request: {err}")
+                quests_api_client.post_output(
+                            team_id=team_data['team-id'],
+                            quest_id=QUEST_ID,
+                            key=output_const.TASK4_WRONG_KEY,
+                            label=output_const.TASK4_WRONG_LABEL,
+                            value=output_const.TASK4_WRONG_VALUE,
+                            dashboard_index=output_const.TASK4_WRONG_INDEX,
+                            markdown=output_const.TASK4_WRONG_MARKDOWN,
+                        )
+                
+                team_data['migration-location'] = 'unknown'
+                team_data['task4-score-locked'] = False
 
-        else:
-            print(f"Received wrong answer '{event['value']}' from the team")
+                quests_api_client.post_input(
+                        team_id=team_data['team-id'],
+                        quest_id=QUEST_ID,
+                        key=input_const.TASK4_MIGRATION_KEY,
+                        label=input_const.TASK4_MIGRATION_LABEL,
+                        description=input_const.TASK4_MIGRATION_DESCRIPTION,
+                        dashboard_index=input_const.TASK4_MIGRATION_INDEX
+                    )
+                    
+                dynamodb_utils.save_team_data(team_data, quest_team_status_table)
 
-            # Post output
-            quests_api_client.post_output(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                key=output_const.TASK4_WRONG_KEY,
-                label=output_const.TASK4_WRONG_LABEL,
-                value=output_const.TASK4_WRONG_VALUE,
-                dashboard_index=output_const.TASK4_WRONG_INDEX,
-                markdown=output_const.TASK4_WRONG_MARKDOWN,
-            )
-
-            # Detract points
-            quests_api_client.post_score_event(
-                team_id=team_data["team-id"],
-                quest_id=QUEST_ID,
-                description=scoring_const.THE_ANSWER_WRONG_DESC,
-                points=scoring_const.THE_ANSWER_WRONG_POINTS
-            )
+        except Exception as err:
+            print(f"Error while handling team update request: {err}")
 
     else:
         print(f"Unknown input key {event['key']} encountered, ignoring.")

@@ -83,7 +83,8 @@ def lambda_handler(event, context):
             'is-website-released': False,
             'is-debug-mode': False,
             'is-apprunner-done': False,
-            'is-final-task-enabled': False,
+            'is-db-migrated': False,
+            'migration-location': 'unknown',
             'is-answer-to-life-correct': False,
             'version': 0 # This is for optimistic locking
         }
@@ -112,20 +113,20 @@ def lambda_handler(event, context):
         markdown=output_const.TASK1_MARKDOWN,
     )
 
-    # Post task 1 CREDENTIALS  # TODO: pretty this up
+    
     quests_api_client.post_output(
-        team_id=team_id,
+        team_id=team_data['team-id'],
         quest_id=QUEST_ID,
         key=output_const.TASK1_CREDS_KEY,
         value=f"""
-        ### {output_const.TASK1_CREDS_VALUE} 
-        * **TEAM ID:** {team_table}   
-        * **LD_SERVER_KEY:** {ld_server_key}   
-        * **LD_CLIENT_KEY:** {ld_client_key}  
-        * **LD-SignOnUrl:** {ld_signonurl}
+### Credentials Below:
+* **TEAM ID:** {team_table} 
+* **LD_SERVER_KEY:** {ld_server_key}
+* **LD_CLIENT_KEY:** {ld_client_key} 
+* **LD-SignOnUrl:** [Click Here]({ld_signonurl})
         """,
         dashboard_index=output_const.TASK1_CREDS_INDEX,
-        markdown=output_const.TASK1_CREDS_MARKDOWN,
+        markdown=True,
     )
 
     # quests_api_client.post_output(
