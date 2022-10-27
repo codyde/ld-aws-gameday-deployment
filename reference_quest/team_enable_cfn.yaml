@@ -37,6 +37,10 @@ Parameters:
     Default: 'app-gameday-ld'
     Description: Gameday Repo Name
     Type: String
+  ECRRepoName:
+    Default: 'unicornrentalsapp'
+    Description: ECR Repo Name
+    Type: String
   LaunchDarklyClientKeySsmParam:
     Default: 'LD-ClientKey'
     Description: Client SDK Key for LaunchDarkly configuration
@@ -314,6 +318,8 @@ Resources:
 
   UnicornRentalsApp:
     Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref ECRRepoName
 
   MyAppRepo:
     Type: AWS::CodeCommit::Repository
