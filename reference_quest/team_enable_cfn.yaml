@@ -360,7 +360,7 @@ Resources:
   Role:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: 'AppRunnerRole'
+      RoleName: 'LDUnicornAppRunnerInstanceRole'
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow

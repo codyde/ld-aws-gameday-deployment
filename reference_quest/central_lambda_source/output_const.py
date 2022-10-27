@@ -7,7 +7,7 @@ WELCOME_LABEL="Welcome to the (soon to be) NEW Unicorn.Rentals"
 WELCOME_VALUE="""
 At Unicorn.Rentals, we hire dreamers not just "techs”. We seek those who share our vision and are willing to put in extra hours to take our offering of mythical creatures to the next level. Our solutions are diverse and the things we are building are going to delight our users. 
 
-But first... Unicorn.Rentals needs to deliver it's next generation, cloud hosted, marketing website! As the core team responsible for the deployment and migration, you'll ship the features that power Unicorn.Rentals new marketing website, and debug any problems that come up when the Unicorns break loose. You'll divide tasks up between your team focused on building new feature flags, creating rollout strategies, and delivering the new website... hopefully with no broken horns! 
+But first... Unicorn.Rentals needs to deliver it's next generation, cloud hosted, marketing website! As the core team responsible for the deployment and migration, you'll ship the features that power Unicorn.Rentals new marketing website, and debug any problems that come up when the Unicorns break loose. Throughout this challenge you'll explore rolling out the new website, building feature flags, troubleshooting problems, and rolling out new capabilities... hopefully with no broken horns! 
 """
 WELCOME_INDEX=1
 WELCOME_MARKDOWN=True
@@ -21,12 +21,12 @@ The pipelines have ran and its time to deploy our new Unicorn.Rentals into AWS! 
 
 As the Cloud Administrator at Unicorn.Rentals, you'll need to deploy the image for the website to AWS App Runner. As part of this exercise, ensure the following configurations are applied: 
 
-* Search for `unicornrentalsapp` in the image list, and use this as your image. **NOTE** The actual image name will have additional characters to make sure you have the most unique unicorn image possible.
-* For the **ECR access Role** ensure you have selected the `AppRunnerECRAccessRole` from the list
+* For the image, select **Browse** and type in `unicornrentalsapp` in the image list, and use this as your image. **NOTE: The actual image name will have have many additional characters on the front and end of "unicornrentalsapp" - this is to ensure your Unicorn is the most unique Unicorn possible.**
+* For the **ECR Access Role** ensure you have selected the `AppRunnerECRAccessRole` from the list
 * Create an environment variable named `LD_SERVER_KEY`, with the matching Server SDK key values from the credential list (or from within LaunchDarkly). This allows the server component of your application to render feature flags from LaunchDarkly. The client side SDK is not needed for this step. 
 * Create an additional environment variable for your **Team ID** named `TEAM_ID` and the TEAM value from your credentials. 
 * Set the port for the App Runner application to `5000`
-* On the security tab, ensure you have selected the **instance role** titled **AppRunnerRole** to allow connectivity to the necessary Unicorn.Rentals cloud resources 
+* On the security tab, ensure you have selected the **instance role** titled **LDUnicornAppRunnerInstanceRole** to allow connectivity to the necessary Unicorn.Rentals cloud resources 
 
 When your deployment is complete and running successfully (this may take around 5 minutes), enter the full URL (including https://) below and the system will validate if the application is up! 
 
@@ -69,11 +69,11 @@ TASK1_COMPLETE_MARKDOWN=True
 TASK2_KEY="task2"
 TASK2_LABEL="Task 2 - Releasing the new Unicorn.Rentals!"
 TASK2_VALUE="""
-You just received a notification from the web development team that the new version of the Unicorn.Rentals website is ready for user testing! They have pushed their changed to the site already, but also included a **[feature flag](https://launchdarkly.com/blog/what-are-feature-flags/)** that is preventing it from being seen by most users. As the engineer helping roll out the new site and release the changes, it's now up to you to create a flag in [LaunchDarkly](https://app.launchdarkly.com) that allows users to see the new website. 
+You just received a notification from the web development team that the new version of the Unicorn.Rentals website is ready for user testing! They have pushed their changes to the site already, but also included a **[feature flag](https://launchdarkly.com/blog/what-are-feature-flags/)** that is preventing it from being seen by most users. As the engineer helping roll out the new site and release the changes, it's now up to you to create a flag in [LaunchDarkly](https://app.launchdarkly.com) that allows users to see the new website. 
 
 The development team has included the details for the feature flag to be created in the application code [here](https://github.com/codyde/ld-aws-gameday/blob/a383dbf064d081b841937b27b637519243726470/pages/index.js#L55). Use this information to create a feature flag that will release the Unicorn.Rentals website with LaunchDarkly.
 
-Once the [feature flag](https://launchdarkly.com/blog/what-are-feature-flags/) is enabled, you'll be able to access a new API on the `/status` route, which you can use to validate that the correct version of Unicorn.Rentals has launched! We will use this value in the input box below.   
+Once the feature flag is enabled, you'll be able to access a new API on the `/status` route, which you can use to validate that the correct version of Unicorn.Rentals has launched! We will use this value in the input box below.   
 """
 TASK2_INDEX=20
 TASK2_MARKDOWN=True
