@@ -140,80 +140,80 @@ def evaluate_apprunner(quests_api_client, team_data):
             team_data['start-task-2'] = True
             dynamodb_utils.save_team_data(team_data, quest_team_status_table)
 
-            quests_api_client.delete_output(
-                    team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
-                    key=output_const.TASK1_APPRUNNER_DOWN_KEY
-                )
+            # quests_api_client.delete_output(
+            #         team_id=team_data["team-id"],
+            #         quest_id=QUEST_ID, 
+            #         key=output_const.TASK1_APPRUNNER_DOWN_KEY
+            #     )
 
-            quests_api_client.delete_hint(
-                team_id=team_data["team-id"],
-                quest_id=QUEST_ID, 
-                hint_key=hint_const.TASK1_HINT1_KEY,
-                detail=True
-            )
+            # quests_api_client.delete_hint(
+            #     team_id=team_data["team-id"],
+            #     quest_id=QUEST_ID, 
+            #     hint_key=hint_const.TASK1_HINT1_KEY,
+            #     detail=True
+            # )
 
-            quests_api_client.post_output(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                key=output_const.TASK1_COMPLETE_KEY,
-                label=output_const.TASK1_COMPLETE_LABEL,
-                value=output_const.TASK1_COMPLETE_VALUE,
-                dashboard_index=output_const.TASK1_COMPLETE_INDEX,
-                markdown=output_const.TASK1_COMPLETE_MARKDOWN,
-            )
+            # quests_api_client.post_output(
+            #     team_id=team_data['team-id'],
+            #     quest_id=QUEST_ID,
+            #     key=output_const.TASK1_COMPLETE_KEY,
+            #     label=output_const.TASK1_COMPLETE_LABEL,
+            #     value=output_const.TASK1_COMPLETE_VALUE,
+            #     dashboard_index=output_const.TASK1_COMPLETE_INDEX,
+            #     markdown=output_const.TASK1_COMPLETE_MARKDOWN,
+            # )
             
             # Stage Task 2 Things
 
-            quests_api_client.post_input(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                key=input_const.TASK2_LAUNCH_KEY,
-                label=input_const.TASK2_LAUNCH_LABEL,
-                description=input_const.TASK2_LAUNCH_DESCRIPTION,
-                dashboard_index=input_const.TASK2_LAUNCH_INDEX,
-                markdown=True
-            )
+            # quests_api_client.post_input(
+            #     team_id=team_data['team-id'],
+            #     quest_id=QUEST_ID,
+            #     key=input_const.TASK2_LAUNCH_KEY,
+            #     label=input_const.TASK2_LAUNCH_LABEL,
+            #     description=input_const.TASK2_LAUNCH_DESCRIPTION,
+            #     dashboard_index=input_const.TASK2_LAUNCH_INDEX,
+            #     markdown=True
+            # )
 
             # image_url = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}curl.jpeg",signed_duration=86400)
 
-            quests_api_client.post_output(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                key=output_const.TASK2_KEY,
-                label=output_const.TASK2_LABEL,
-                value=output_const.TASK2_VALUE,
-                dashboard_index=output_const.TASK2_INDEX,
-                markdown=output_const.TASK2_MARKDOWN,
-            )
+            # quests_api_client.post_output(
+            #     team_id=team_data['team-id'],
+            #     quest_id=QUEST_ID,
+            #     key=output_const.TASK2_KEY,
+            #     label=output_const.TASK2_LABEL,
+            #     value=output_const.TASK2_VALUE,
+            #     dashboard_index=output_const.TASK2_INDEX,
+            #     markdown=output_const.TASK2_MARKDOWN,
+            # )
 
-            quests_api_client.post_input(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                key=input_const.TASK2_LAUNCH_KEY,
-                label=input_const.TASK2_LAUNCH_LABEL,
-                description=input_const.TASK2_LAUNCH_DESCRIPTION,
-                dashboard_index=input_const.TASK2_LAUNCH_INDEX
-            )
+            # quests_api_client.post_input(
+            #     team_id=team_data['team-id'],
+            #     quest_id=QUEST_ID,
+            #     key=input_const.TASK2_LAUNCH_KEY,
+            #     label=input_const.TASK2_LAUNCH_LABEL,
+            #     description=input_const.TASK2_LAUNCH_DESCRIPTION,
+            #     dashboard_index=input_const.TASK2_LAUNCH_INDEX
+            # )
 
-            quests_api_client.post_hint(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                hint_key=hint_const.TASK2_HINT1_KEY,
-                label=hint_const.TASK2_HINT1_LABEL,
-                description=hint_const.TASK2_HINT1_DESCRIPTION,
-                value=hint_const.TASK1_HINT2_VALUE,
-                dashboard_index=hint_const.TASK2_HINT1_INDEX,
-                cost=hint_const.TASK1_HINT2_COST,
-                status=hint_const.STATUS_OFFERED
-            )
+            # quests_api_client.post_hint(
+            #     team_id=team_data['team-id'],
+            #     quest_id=QUEST_ID,
+            #     hint_key=hint_const.TASK2_HINT1_KEY,
+            #     label=hint_const.TASK2_HINT1_LABEL,
+            #     description=hint_const.TASK2_HINT1_DESCRIPTION,
+            #     value=hint_const.TASK1_HINT2_VALUE,
+            #     dashboard_index=hint_const.TASK2_HINT1_INDEX,
+            #     cost=hint_const.TASK1_HINT2_COST,
+            #     status=hint_const.STATUS_OFFERED
+            # )
 
-            response = quests_api_client.delete_hint(
-                team_id=team_data['team-id'],
-                quest_id=QUEST_ID,
-                hint_key=hint_const.TASK1_HINT1_KEY,
-                detail=True
-            )   
+            # response = quests_api_client.delete_hint(
+            #     team_id=team_data['team-id'],
+            #     quest_id=QUEST_ID,
+            #     hint_key=hint_const.TASK1_HINT1_KEY,
+            #     detail=True
+            # )   
             
             # Handling a response status code other than 200. In this case, we are just logging
             if response['statusCode'] != 200:

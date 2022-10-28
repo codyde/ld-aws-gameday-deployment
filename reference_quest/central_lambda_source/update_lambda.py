@@ -158,11 +158,11 @@ def lambda_handler(event, context):
             dynamodb_utils.save_team_data(team_data, quest_team_status_table)
 
             # Delete input since cannot be updated as task can be started only once
-            quests_api_client.delete_input(
-                team_id=team_data["team-id"],
-                quest_id=QUEST_ID, 
-                key=input_const.TASK1_ENDPOINT_KEY
-            )
+            # quests_api_client.delete_input(
+            #     team_id=team_data["team-id"],
+            #     quest_id=QUEST_ID, 
+            #     key=input_const.TASK1_ENDPOINT_KEY
+            # )
 
             apphealth = check_webapp(team_data['app-runner-url'])
 
@@ -172,6 +172,12 @@ def lambda_handler(event, context):
                 # team_data['is-apprunner-done'] = True
                 # print(f"Updating the apprunner-done task to true")
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
+
+                quests_api_client.delete_input(
+                    team_id=team_data["team-id"],
+                    quest_id=QUEST_ID, 
+                    key=input_const.TASK1_ENDPOINT_KEY
+                )
                 
                 quests_api_client.post_score_event(
                     team_id=team_data["team-id"],
@@ -310,12 +316,12 @@ def lambda_handler(event, context):
 
     # Task 2 Website Release 
     if (event['key'] == input_const.TASK2_LAUNCH_KEY and not team_data['is-website-released']):
-        print("Removing input and locking the scoring")
-        quests_api_client.delete_input(
-            team_id=team_data["team-id"],
-            quest_id=QUEST_ID, 
-            key=input_const.TASK2_LAUNCH_KEY
-        )
+        print("Evaluating Task 2")
+        # quests_api_client.delete_input(
+        #     team_id=team_data["team-id"],
+        #     quest_id=QUEST_ID, 
+        #     key=input_const.TASK2_LAUNCH_KEY
+        # )
         task2_Score_Lock = team_data['task2-score-locked']
         if not task2_Score_Lock:
             team_data['task2-score-locked'] = True
@@ -336,6 +342,13 @@ def lambda_handler(event, context):
                 
                 print("unlocking task2 score lock")
                 team_data['task2-score-locked'] = False
+
+                print("Removing input and locking the scoring")
+                quests_api_client.delete_input(
+                    team_id=team_data["team-id"],
+                    quest_id=QUEST_ID, 
+                    key=input_const.TASK2_LAUNCH_KEY
+                )
                 
                 print("Trying to delete unlreased error")
                 quests_api_client.delete_output(
@@ -451,19 +464,21 @@ def lambda_handler(event, context):
     # Task 3 Debug Mode Enablement
     elif event['key'] == input_const.TASK3_DEBUG_KEY and not team_data['is-debug-mode'] and not team_data['task3-score-locked']: # run if debug mode is false and task lock is off
         try:
-            print("Removing input and locking the scoring")
-            quests_api_client.delete_input(
-                    team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
-                    key=input_const.TASK3_DEBUG_KEY
-                )
+            print("Evaluating task 3")
+            
             team_data['task3-score-locked'] = True
             dynamodb_utils.save_team_data(team_data, quest_team_status_table)
             team_data['task3-attempted'] = True
             input_value = event['value']
             team_data['debugcode'] = input_value
             debugstatus = getDebugValue(team_data)
-            if debugstatus:
+            if debugstatus == True:
+
+                quests_api_client.delete_input(
+                    team_id=team_data["team-id"],
+                    quest_id=QUEST_ID, 
+                    key=input_const.TASK3_DEBUG_KEY
+                )
 
                 quests_api_client.delete_output(
                         team_id=team_data['team-id'],
@@ -553,6 +568,7 @@ def lambda_handler(event, context):
     # Task 4 - DB Migration
     elif event['key'] == input_const.TASK4_MIGRATION_KEY and not team_data['is-db-migrated'] and not team_data['task4-score-locked']:
         try:
+            print("Evaluating task 4")
             # Check team's input value
             team_data['task4-score-locked'] = True
             quests_api_client.delete_input(
@@ -564,6 +580,12 @@ def lambda_handler(event, context):
             team_data['migration-location'] = value
             migrated = getMigrationValue(team_data)
             if migrated == True:
+
+                quests_api_client.delete_input(
+                        team_id=team_data["team-id"],
+                        quest_id=QUEST_ID, 
+                        key=input_const.TASK4_MIGRATION_KEY
+                    )
 
                 # Delete error if it exists 
                 team_data['is-db-migrated'] = True

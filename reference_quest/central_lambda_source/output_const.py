@@ -21,12 +21,13 @@ The pipelines have ran and its time to deploy our new Unicorn.Rentals into AWS! 
 
 As the Cloud Administrator at Unicorn.Rentals, you'll need to deploy the image for the website to AWS App Runner. As part of this exercise, ensure the following configurations are applied: 
 
-* For the image, select **Browse** and type in `unicornrentalsapp` in the image list, and use this as your image. **NOTE: The actual image name will have have many additional characters on the front and end of "unicornrentalsapp" - this is to ensure your Unicorn is the most unique Unicorn possible.**
-* For the **ECR Access Role** ensure you have selected the `AppRunnerECRAccessRole` from the list
-* Create an environment variable named `LD_SERVER_KEY`, with the matching Server SDK key values from the credential list (or from within LaunchDarkly). This allows the server component of your application to render feature flags from LaunchDarkly. The client side SDK is not needed for this step. 
-* Create an additional environment variable for your **Team ID** named `TEAM_ID` and the TEAM value from your credentials. 
-* Set the port for the App Runner application to `5000`
-* On the security tab, ensure you have selected the **instance role** titled **LDUnicornAppRunnerInstanceRole** to allow connectivity to the necessary Unicorn.Rentals cloud resources 
+* **Container Image URL** - Select **Browse** and type in `unicornrentalsapp` in the image list, and use this as your image. **NOTE: The actual image name will have have many additional characters on the front and end of "unicornrentalsapp" - this is to ensure your Unicorn is the most unique Unicorn possible.**
+* **ECR Access Role** - Select **Create new service role** and give it an appropriate name 
+* **Service name** - Your choice! 
+* Create an **Environment Variable** with a key of `LD_SERVER_KEY` and value of the Server SDK key from the crenetials 
+* Create an **Environment Variable** with a key of  `TEAM_ID` and the TEAM value from your credentials. 
+* **Port** - Set to `5000`
+* **Security Tab > Instance role** - Set to `LDUnicornAppRunnerInstanceRole`
 
 When your deployment is complete and running successfully (this may take around 5 minutes), enter the full URL (including https://) below and the system will validate if the application is up! 
 
