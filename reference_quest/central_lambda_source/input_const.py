@@ -4,8 +4,13 @@
 # TASK 1 - App Runner Endpoint
 TASK1_ENDPOINT_KEY='task1_endpoint'
 TASK1_ENDPOINT_INDEX=12
-TASK1_ENDPOINT_LABEL="What is the full URL for the AWS App Runner instance?"
-TASK1_ENDPOINT_DESCRIPTION="i.e. https://awsapprunnerurl.domain.com"
+TASK1_ENDPOINT_LABEL="What is the name you created for the  AWS App Runner instance?"
+TASK1_ENDPOINT_DESCRIPTION="i.e. UnicornApp"
+
+TASK1_API_KEY='task1_api'
+TASK1_API_INDEX=13
+TASK1_API_LABEL="What is the API Key from within LaunchDarkly?"
+TASK1_API_DESCRIPTION="i.e. api-xxx-xxxxx-xxxx-xxxxx"
 
 # TASK 2 - First Feature Deployment
 

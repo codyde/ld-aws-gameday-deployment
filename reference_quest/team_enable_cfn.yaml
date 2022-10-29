@@ -121,6 +121,13 @@ Resources:
             Effect: Allow
             Action:
               - ecr:*
+      - PolicyName: AppRunnerQuery
+        PolicyDocument:
+          Statement:
+          - Resource: "*"
+            Effect: Allow
+            Action:
+              - apprunner:ListServices
 
       
   ResourceLookupLambda:
@@ -351,7 +358,7 @@ Resources:
           - Name: LD_SERVER_KEY
             Value: !Ref LaunchDarklyServerKeySsmParam
             Type: PLAINTEXT
-          - Name: NEXT_PUBLIC_TEAM_ID
+          - Name: TEAM_ID
             Value: !Ref TeamTableSsmParam
             Type: PLAINTEXT
       Name: !Sub ${AWS::StackName}-image-build

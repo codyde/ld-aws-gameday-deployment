@@ -4,7 +4,7 @@
 #!/bin/bash
 
 QUEST_ROOT_DIR=${PWD}
-BUILD_QUEST_NAME=LaunchDarkly Flags
+BUILD_QUEST_NAME="LaunchDarkly Feature Flags"
 BUILD_QUEST_ID=7bb514a9-a6dc-4fc0-a797-3f4a7bbd17bb
 BUILD_QUEST_BUCKET_NAME=${QDK_ASSETS_BUCKET}                              # when deploying locally
 #BUILD_QUEST_BUCKET_NAME=ee-assets-prod-us-east-1                         # when deploying to production

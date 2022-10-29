@@ -81,9 +81,12 @@ def lambda_handler(event, context):
             'is-webapp-up': False,
             'app-version': 'unknown',            
             'is-website-released': False,
+            'ld-api-key-completed': False,
+            'ld-api-key': 'unknown',
             'is-debug-mode': False,
             'is-apprunner-done': False,
             'is-db-migrated': False,
+            'ld-project-key': 'unknown',
             'migration-location': 'unknown',
             'is-answer-to-life-correct': False,
             'version': 0 # This is for optimistic locking
