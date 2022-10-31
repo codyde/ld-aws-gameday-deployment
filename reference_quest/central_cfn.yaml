@@ -348,6 +348,14 @@ Resources:
               - ssm:GetParameters
               - ssm:PutParameter
             Resource: "*"
+      - PolicyName: AppRunnerQuery
+        PolicyDocument:
+          Statement:
+          - Resource: "*"
+            Effect: Allow
+            Action:
+              - apprunner:List*
+              - apprunner:Describe*
 
 Outputs:
   TableName:

@@ -134,9 +134,9 @@ TASK3_MARKDOWN=True
 
 
 TASK3_INCORRECT_KEY="task3_incorrect"
-TASK3_INCORRECT_LABEL="The status code you entered is invalid"
+TASK3_INCORRECT_LABEL="The status code you entered is invalid or your targeting rule is missing"
 TASK3_INCORRECT_VALUE="""
-It appears the status code value that you showed is incorrect. Ensure you've created the correct feature flag of `logMode`, targeted the `debuguser` with the `debug` value, and enabled the feature flag.
+We need the status code, and to ensure that only our targeting unicorn, `debuguser`, is receiving the logMode. It appears that either the status code value that you showed is incorrect, or your targeting rule is missing for this feature flag. Ensure you've created the correct feature flag of `logMode`, targeted the `debuguser` with the `debug` value, and enabled the feature flag.
 """
 TASK3_INCORRECT_INDEX=35
 TASK3_INCORRECT_MARKDOWN=True

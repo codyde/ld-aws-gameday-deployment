@@ -80,6 +80,14 @@ Resources:
           - sts:AssumeRole
       Description: Provides permissions for internally-invoked Lambda resources
       Policies:
+      - PolicyName: AppRunnerQuery
+        PolicyDocument:
+          Statement:
+          - Resource: "*"
+            Effect: Allow
+            Action:
+              - apprunner:List*
+              - apprunner:Describe*
       - PolicyName: CloudWatchLogsPolicy
         PolicyDocument:
           Version: '2012-10-17'
@@ -121,13 +129,6 @@ Resources:
             Effect: Allow
             Action:
               - ecr:*
-      - PolicyName: AppRunnerQuery
-        PolicyDocument:
-          Statement:
-          - Resource: "*"
-            Effect: Allow
-            Action:
-              - apprunner:ListServices
 
       
   ResourceLookupLambda:
