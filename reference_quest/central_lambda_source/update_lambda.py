@@ -95,6 +95,21 @@ def get_ld_project(apikey):
         print(f"Unable to connect: {e}")
         return e
 
+def getlogModeTargeting(team_data):
+    try:
+        url = f"https://app.launchdarkly.com/api/v2/flags/{team_data['ld-project-key']}/logMode"
+        headers = {"Authorization": team_data['ld-api-key']}
+        response = requests.get(url, headers=headers)
+        data = response.json()
+        targetedUser = data['environments']['test']['targets'][0]['values'][0]
+        if targetedUser == 'debuguser':
+            return True
+        else:
+            raise Exception(f"The debuguser is not targeted")
+    except Exception as e:
+        print(f"There was an error on executing this api call: {e}")
+        return False
+
 def getAppRelease(team_data):
     try:
         print(f"Getting current version via API")
@@ -327,12 +342,14 @@ def lambda_handler(event, context):
 
     if (event['key'] == input_const.TASK1_API_KEY and not team_data['ld-api-key-completed']):
         try:
+            print("Adding api key "+event['value']+" to quest")
             team_data['ld-api-key'] = event['value']
 
             if check_apikey(team_data['ld-api-key']) == True:
                 team_data['ld-api-key-completed'] = True
 
-                team_data['ld-project-key'] == get_ld_project(team_data['ld-api-key'])
+                team_data['ld-project-key'] = get_ld_project(team_data['ld-api-key'])
+                dynamodb_utils.save_team_data(team_data, quest_team_status_table)
 
                 quests_api_client.delete_input(
                     team_id=team_data["team-id"],
@@ -426,7 +443,7 @@ def lambda_handler(event, context):
             print(f"Error while handling team update request: {err}")
 
     # Task 2 Website Release 
-    if (event['key'] == input_const.TASK2_LAUNCH_KEY and not team_data['is-website-released'] and not team_data['is-api-key-completed']):
+    if (event['key'] == input_const.TASK2_LAUNCH_KEY and not team_data['is-website-released'] and team_data['is-api-key-completed'] == True):
         print("Evaluating Task 2")
 
         task2_Score_Lock = team_data['task2-score-locked']
@@ -575,14 +592,14 @@ def lambda_handler(event, context):
     elif event['key'] == input_const.TASK3_DEBUG_KEY and not team_data['is-debug-mode'] and not team_data['task3-score-locked']: # run if debug mode is false and task lock is off
         try:
             print("Evaluating task 3")
-            
             team_data['task3-score-locked'] = True
             dynamodb_utils.save_team_data(team_data, quest_team_status_table)
             team_data['task3-attempted'] = True
             input_value = event['value']
             team_data['debugcode'] = input_value
             debugstatus = getDebugValue(team_data)
-            if debugstatus == True:
+            targetingOn = getlogModeTargeting(team_data)
+            if debugstatus == True and targetingOn == True:
 
                 quests_api_client.delete_input(
                     team_id=team_data["team-id"],
