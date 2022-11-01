@@ -17,11 +17,11 @@ WELCOME_MARKDOWN=True
 TASK1_KEY="task1"
 TASK1_LABEL="Task 1 - Unicorns in the Clouds! Deploying the new Unicorn.Rentals!"
 TASK1_VALUE="""
-It's Day 1, your first build pipeline for the the new Unicorn.Rentals website is already running! Roll up your sleeves, crack your knuckles, and get the application UP. 
+It's Day 1, your first build pipeline for the the new Unicorn.Rentals website is running currently. Roll up your sleeves, crack your knuckles, and get the application UP! 
 
-As the Cloud Administrator at Unicorn.Rentals, you  need to deploy the image for the website using AWS App Runner.  
+As the Cloud Administrator at Unicorn.Rentals, you need to deploy the image for the website using AWS App Runner.  
 
-As part of this exercise, ensure the following configurations are set: 
+## App Runner Configuration: 
 
 1. **Container Image URL** - Select **Browse** and type in `unicornrentalsapp` in the image list, choose the corresponding image. The image name will have have many additional characters in addition to `unicornrentalsapp` that is the correct one. If you do not see the image, check to see if you pipeline has finished building and refresh App Runner. 
 2. **ECR Access Role** - Select **Create new service role** and use the default name that appears.  
@@ -30,7 +30,7 @@ As part of this exercise, ensure the following configurations are set:
 5. **Port** - Set it to `5000`
 6. **Security Tab > Instance role** - Set to `LDUnicornAppRunnerInstanceRole`
 
-When your deployment is complete, enter the name you created (**CASE SENSITIVE**) below to validate your configuration.
+When you complete the above steps, enter the name you created (**CASE SENSITIVE**) below to validate your configuration.
 
 **Note: Incorrect submissions will cost you!**
 """
@@ -61,9 +61,11 @@ TASK1_APPRUNNER_INPUT_REMOVED_MARKDOWN=True
 TASK1_APPRUNNER_COMPLETE_KEY="task1_apprunner_complete"
 TASK1_APPRUNNER_COMPLETE_LABEL="Unicorn.Rentals is up and running!"
 TASK1_APPRUNNER_COMPLETE_VALUE="""
-Unicorn.Rentals is in the process of deploying. You created an App Runner deployment of the new marketing website, and validated the URL thats being generated, which will be functional shortly. You are one step closer to having the site live and serving user traffic! 
+Unicorn.Rentals is in the process of deploying. You created an App Runner deployment of the new marketing website, and validated the URL thats being generated, which will be functional shortly (within 5-10 minutes). You are one step closer to having the site live and serving user traffic! 
 
-Now that our site is live, we can start using [Feature Flags](https://launchdarkly.com/blog/what-are-feature-flags/) in LaunchDarkly. While the site is building, we need to acquire an API key that other teams can use to integrate with LaunchDarkly services. Navigate to LaunchDarkly and [create an API token](https://docs.launchdarkly.com/home/account-security/api-access-tokens#creating-api-access-tokens) using a `Custom Role` with your student box checked, you don't need to change any other settings. Copy this API key and paste it below for the other teams at Unicorn.Rentals to use! 
+We're going to use LaunchDarkly to manage our feature releases separate from the deployment using [Feature Flags](https://launchdarkly.com/blog/what-are-feature-flags/).
+
+While the site is building, we need to acquire an API key that other teams can use to integrate with LaunchDarkly services. Navigate to LaunchDarkly and [create an API token](https://docs.launchdarkly.com/home/account-security/api-access-tokens#creating-api-access-tokens) using the `Custom Role` option with your student box checked, you don't need to change any other settings. Copy this API key and paste it below for the other teams at Unicorn.Rentals to use! 
 
 It's time to start creating our feature flags and launching the **NEW** Unicorn.Rentals!
 """
