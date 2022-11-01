@@ -113,13 +113,10 @@ def getlogModeTargeting(team_data):
 def getAppRelease(team_data):
     try:
         print(f"Getting current version via API")
-        conn = http.client.HTTPSConnection(team_data['app-runner-url'].strip('https://'), timeout=5)
-        conn.request("GET", "/status")
-        res = conn.getresponse()
-        string = res.read().decode('utf-8')
-        dataResp = json.loads(string)
-        print(dataResp['app-version'])
-        if dataResp['app-version'] == team_data['app-version']:
+        conn = requests.get(team_data['app-runner-url']+'/status')
+        data = conn.json()
+        print(data['app-version'])
+        if data['app-version'] == team_data['app-version']:
             return True
         else:
             raise Exception(f"The version does not match")
@@ -130,13 +127,10 @@ def getAppRelease(team_data):
 def getDebugValue(team_data):
     try:
         print(f"Getting debug value via the /teamdebug API")
-        conn = http.client.HTTPSConnection(team_data['app-runner-url'].strip('https://'), timeout=5)
-        conn.request("GET", "/teamdebug")
-        res = conn.getresponse()
-        string = res.read().decode('utf-8')
-        dataResp = json.loads(string)
-        print(dataResp['debugcode'])
-        if dataResp['debugcode'] == team_data['debugcode']:
+        conn = requests.get(team_data['app-runner-url']+'/teamdebug')
+        res = conn.json()
+        print(res['debugcode'])
+        if res['debugcode'] == team_data['debugcode']:
             return True
         else:
             raise Exception(f"The debug code is invalid")
@@ -146,14 +140,11 @@ def getDebugValue(team_data):
 
 def getMigrationValue(team_data):
     try:
-        print(f"Getting debug value via the /teamdebug API")
-        conn = http.client.HTTPSConnection(team_data['app-runner-url'].strip('https://'), timeout=5)
-        conn.request("GET", "/health")
-        res = conn.getresponse()
-        string = res.read().decode('utf-8')
-        dataResp = json.loads(string)
-        print(dataResp['location'])
-        if dataResp['location'] == team_data['migration-location']:
+        print(f"Getting debug value via the /health API")
+        conn = requests.get(team_data['app-runner-url']+'/health')
+        res = conn.json()
+        print(res['location'])
+        if res['location'] == team_data['migration-location']:
             return True
         else:
             raise Exception(f"The migration location is invalid")
@@ -443,7 +434,7 @@ def lambda_handler(event, context):
             print(f"Error while handling team update request: {err}")
 
     # Task 2 Website Release 
-    if (event['key'] == input_const.TASK2_LAUNCH_KEY and not team_data['is-website-released'] and team_data['is-api-key-completed'] == True):
+    if (event['key'] == input_const.TASK2_LAUNCH_KEY and not team_data['is-website-released'] and team_data['ld-api-key-completed'] == True):
         print("Evaluating Task 2")
 
         task2_Score_Lock = team_data['task2-score-locked']

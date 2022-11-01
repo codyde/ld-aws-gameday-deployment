@@ -81,7 +81,7 @@ def lambda_handler(event, context):
             'is-webapp-up': False,
             'app-version': 'unknown',            
             'is-website-released': False,
-            'ld-api-key-completed': False,
+            'is-api-key-completed': False,
             'ld-api-key': 'unknown',
             'is-debug-mode': False,
             'is-apprunner-done': False,
