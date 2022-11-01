@@ -32,9 +32,3 @@ TASK4_MIGRATION_KEY='task4_version'
 TASK4_MIGRATION_INDEX=41
 TASK4_MIGRATION_LABEL="What's the **location** value in the /health API endpoint?"
 TASK4_MIGRATION_DESCRIPTION="ex: environment"
-
-#TASK 5 - The Master Switch Bonus Task
-TASK5_MASTER_KEY='task5_version'
-TASK5_MASTER_INDEX=51
-TASK5_MASTER_LABEL="What's the name of your master flag?"
-TASK5_MASTER_DESCRIPTION="ex: masterSwitch "

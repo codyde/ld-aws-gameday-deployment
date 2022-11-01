@@ -36,6 +36,7 @@ This is going to be a string flag, with 2 different values. The code links above
 TASK3_HINT1_INDEX=37
 TASK3_HINT1_COST=200
 
+# TASK 4 HINTS
 TASK4_HINT1_KEY="task4_hint1"
 TASK4_HINT1_LABEL="Not able to migrate the database connectivity?"
 TASK4_HINT1_DESCRIPTION="If you're stuck, click on the Reveal Hint button to get some guidance"
