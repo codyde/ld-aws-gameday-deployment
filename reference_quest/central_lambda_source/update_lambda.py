@@ -692,17 +692,12 @@ def lambda_handler(event, context):
             # Check team's input value
             team_data['task4-score-locked'] = True
 
-            quests_api_client.delete_input(
-                team_id=team_data["team-id"],
-                quest_id=QUEST_ID, 
-                key=input_const.TASK4_MIGRATION_KEY
-            )
-            
             value = event['value']
             team_data['migration-location'] = value
             migrated = getMigrationValue(team_data)
             if migrated == True:
-
+                
+                print("Deleting the Task4 Input")
                 quests_api_client.delete_input(
                     team_id=team_data["team-id"],
                     quest_id=QUEST_ID, 
@@ -710,14 +705,16 @@ def lambda_handler(event, context):
                 )
 
                 # Delete error if it exists 
+                print("Setting DB Migrated to True")
                 team_data['is-db-migrated'] = True
 
+                print("Deleting the error message output")
                 quests_api_client.delete_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
                     key=output_const.TASK4_WRONG_KEY,
                 )
-
+                print("Posting task4 is correct")
                 quests_api_client.post_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
