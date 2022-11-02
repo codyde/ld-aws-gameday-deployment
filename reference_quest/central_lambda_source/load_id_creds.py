@@ -33,9 +33,9 @@ def lambda_handler(event, context):
                 send(event, context, SUCCESS, response_data)
                 return
             except Exception as e:
-                send(event, context, FAILED, response_data)
                 print(f"Custom resource lambda execution for delete has failed: {e}")
                 traceback.print_exc()
+                send(event, context, FAILED, response_data)
                 return
 
         else:  # request type is create or update
@@ -57,9 +57,10 @@ def lambda_handler(event, context):
                 # so defer to check for local Team credentials SSM Params below
                 print("Acct Vending params not present, checking for team credentials next in case this is a Dev environment")
             except Exception as e:
-                send(event, context, FAILED, {}, None)
                 print(f"Lambda execution has failed unexpectedly, unknown request type (probably a debugging code issue): {e}")
                 traceback.print_exc()
+                send(event, context, FAILED, {}, None)
+                return
 
             # CHECK FOR TEAM CREDENTIALS
             try:
@@ -77,11 +78,12 @@ def lambda_handler(event, context):
                         if not acct_vending_creds_found:
                             # No central Acct Vending credentials and this team is missing their Team Credentials!
                             print("****ABORTING PROCESSING****")
-                            print(f"ACCOUNT VENDING/ENVIRONMENT NOT PROPERLY SET UP")
+                            print("ACCOUNT VENDING/ENVIRONMENT NOT PROPERLY SET UP")
                             print(f"For EE Events: account vending credentials will need to be set up! PLEASE REFER TO THE OPERATOR GUIDE!")
                             print(f"For local development: the following Team Credentials are expected in SSM Parameter Store: {TEAM_SSM_PARAMS_NEEDED}")
                             print("****ABORTING PROCESSING****")
-                            send(event, context, FAILED, {}, None)
+                            send(event, context, FAILED, {}, None, reason="ACCOUNT VENDING/ENVIRONMENT NOT PROPERLY SET UP, SSM Params missing!" )
+                            return
 
                         else:
                             # EE: central acct vending set up but missing Team credentials => fetch team credentials
@@ -102,48 +104,68 @@ def lambda_handler(event, context):
                             print(f"Loading Team Credentials onto team acct SSM params for  {team['team-id']}")
                             xa_ssm_client.put_parameter(Name='LD-ServerKey',
                                                         Description="LaunchDarkly Server key",
-                                                        Value=launchdarkly_credentials['serverkey'],
+                                                        Value=launchdarkly_credentials['LAUNCHDARKLY_SERVER_KEY'],
                                                         Overwrite=True,
                                                         Tier="Standard",
                                                         Type="String",
                                                         DataType="text")
                             xa_ssm_client.put_parameter(Name='LD-ClientKey',
                                                         Description="LaunchDarkly Client key",
-                                                        Value=launchdarkly_credentials['clientkey'],
+                                                        Value=launchdarkly_credentials['LAUNCHDARKLY_CLIENT_KEY'],
                                                         Overwrite=True,
                                                         Tier="Standard",
                                                         Type="String",
                                                         DataType="text")
                             xa_ssm_client.put_parameter(Name='LD-SignOnUrl',
                                                         Description="LaunchDarkly SignOn URL",
-                                                        Value=launchdarkly_credentials['signonurl'],
+                                                        Value=launchdarkly_credentials['SSO_LINK'],
                                                         Overwrite=True,
                                                         Tier="Standard",
                                                         Type="String",
                                                         DataType="text")
                             xa_ssm_client.put_parameter(Name='TableNumber',
                                                         Description="Table Number of the Team",
-                                                        Value=launchdarkly_credentials['table'],
+                                                        Value=launchdarkly_credentials['TEAM_ID'],
                                                         Overwrite=True,
                                                         Tier="Standard",
                                                         Type="String",
                                                         DataType="text")
-
+                            # xa_ssm_client.put_parameter(Name='LD-TeamEmail',
+                            #                             Description="Table Number of the Team",
+                            #                             Value=launchdarkly_credentials['TEAM_EMAIL'],
+                            #                             Overwrite=True,
+                            #                             Tier="Standard",
+                            #                             Type="String",
+                            #                             DataType="text")
+                            # xa_ssm_client.put_parameter(Name='LD-TeamName',
+                            #                             Description="Table Number of the Team",
+                            #                             Value=launchdarkly_credentials['TEAM_NAME'],
+                            #                             Overwrite=True,
+                            #                             Tier="Standard",
+                            #                             Type="String",
+                            #                             DataType="text")
+                            # xa_ssm_client.put_parameter(Name='LD-UserEmail',
+                            #                             Description="Table Number of the Team",
+                            #                             Value=launchdarkly_credentials['USER_EMAIL'],
+                            #                             Overwrite=True,
+                            #                             Tier="Standard",
+                            #                             Type="String",
+                            #                             DataType="text")
 
                 print("Account Vending successful")
 
                 send(event, context, SUCCESS, response_data)
                 return
             except Exception as e:
-                send(event, context, FAILED, response_data)
                 print(f"Lambda execution has failed! : {e}")
                 traceback.print_exc()
+                send(event, context, FAILED, response_data)
                 return
 
     except Exception as e:
-        send(event, context, FAILED, {}, None)
         print(f"Lambda execution has failed unexpectedly, unknown request type (probably a debugging code issue): {e}")
         traceback.print_exc()
+        send(event, context, FAILED, {}, None)
         return
 
 # check whether all team credentials are already loaded in SSM Parameter Store
