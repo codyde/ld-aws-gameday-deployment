@@ -691,11 +691,13 @@ def lambda_handler(event, context):
             print("Evaluating task 4")
             # Check team's input value
             team_data['task4-score-locked'] = True
+
             quests_api_client.delete_input(
                 team_id=team_data["team-id"],
                 quest_id=QUEST_ID, 
                 key=input_const.TASK4_MIGRATION_KEY
             )
+            
             value = event['value']
             team_data['migration-location'] = value
             migrated = getMigrationValue(team_data)

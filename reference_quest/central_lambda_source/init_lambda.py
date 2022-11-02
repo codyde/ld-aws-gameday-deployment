@@ -81,7 +81,7 @@ def lambda_handler(event, context):
             'is-webapp-up': False,
             'app-version': 'unknown',            
             'is-website-released': False,
-            'is-api-key-completed': False,
+            'ld-api-key-completed': False,
             'ld-api-key': 'unknown',
             'is-debug-mode': False,
             'is-apprunner-done': False,
@@ -122,8 +122,7 @@ def lambda_handler(event, context):
         quest_id=QUEST_ID,
         key=output_const.TASK1_CREDS_KEY,
         value=f"""
-### Credentials Below:
-* **TEAM ID:** {team_table} 
+### Credentials Below: 
 * **LD_SERVER_KEY:** {ld_server_key}
 * **LD_CLIENT_KEY:** {ld_client_key} 
 * **LD-SignOnUrl:** [Click Here]({ld_signonurl})
