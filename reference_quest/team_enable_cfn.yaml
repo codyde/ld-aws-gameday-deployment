@@ -331,7 +331,10 @@ Resources:
       Code:
         S3:
           Bucket: !Ref StaticAssetsBucket
-          Key: !Ref TeamWorkerSourceKey
+          Key: !Join
+          - ''
+          - - !Ref StaticAssetsKeyPrefix
+            - !Ref TeamWorkerSourceKey
 
   DockerBuildCodeBuildProject:
     Type: AWS::CodeBuild::Project
