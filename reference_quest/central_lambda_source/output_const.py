@@ -198,35 +198,3 @@ QUEST_COMPLETE_LABEL="You're a Dark Launcher now!"
 QUEST_COMPLETE_VALUE='Congratulations! You have successfully created feature flags for several features, used targeting to roll out features to specific users, and even migrated a database - all without redeploying your application once! Great work!'
 QUEST_COMPLETE_INDEX=100
 QUEST_COMPLETE_MARKDOWN=True
-
-# BONUS TASK
-TASK5_KEY="task5"
-TASK5_LABEL="Bonus Task - One Flag to Rule Them All!"
-TASK5_VALUE="""
-As the cloud admin for Unicorn.Rentals you control a lot of the features for our new site. As the site continues to evolve and expand in complexity, new changes could cause major issues for our end users. 
-
-For this bonus task, we want you to implement a flag that can control all the new elements of our site that we've implemented in this quest. One flag that will allow us to instantly shut off every other flag when it is disabled. Sounds powerful huh? Can you do it?
-
-
-"""
-TASK5_INDEX=50
-TASK5_MARKDOWN=True
-
-TASK5_WRONG_KEY="task5_wrong_answer"
-TASK5_WRONG_LABEL="Doesn't look like your flag is working"
-TASK5_WRONG_VALUE="Hmm... it doesn't look like you configured your flag to disable all of your other flags correctly. Remember, we want this flag to be a **requirement** for all of our other flags!"
-TASK5_WRONG_INDEX=52
-TASK5_WRONG_MARKDOWN=True
-
-
-TASK5_CORRECT_KEY="task5_correct_answer"
-TASK5_CORRECT_LABEL="You did it! You control all the features with one click!"
-TASK5_CORRECT_VALUE="""
-Wow! You were able to create a single flag that disables all of your other features! 
-
-Consider this your 'break glass in case of emergency' option if something goes really wrong. While we won't often make all of our flags contigent on a single flag being enabled, prerequisites are a great tool for multi-stage deployments. Using prerequisite flags, we can prevent features getting released that rely on unreleased enhancements which could result in a poor user experience and lots of error messages.  
-
-Congrats again Dark Launcher!
-"""
-TASK5_CORRECT_INDEX=53
-TASK5_CORRECT_MARKDOWN=True
