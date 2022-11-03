@@ -331,7 +331,7 @@ def lambda_handler(event, context):
         except Exception as err:
             print(f"Error while handling team update request: {err}")
 
-    if (event['key'] == input_const.TASK1_API_KEY and not team_data['ld-api-key-completed']):
+    elif (event['key'] == input_const.TASK1_API_KEY and not team_data['ld-api-key-completed']):
         try:
             print("Adding api key "+event['value']+" to quest")
             team_data['ld-api-key'] = event['value']
@@ -396,7 +396,7 @@ def lambda_handler(event, context):
                     hint_key=hint_const.TASK2_HINT1_KEY,
                     label=hint_const.TASK2_HINT1_LABEL,
                     description=hint_const.TASK2_HINT1_DESCRIPTION,
-                    value=hint_const.TASK1_HINT2_VALUE,
+                    value=hint_const.TASK2_HINT1_VALUE,
                     dashboard_index=hint_const.TASK2_HINT1_INDEX,
                     cost=hint_const.TASK1_HINT2_COST,
                     status=hint_const.STATUS_OFFERED
@@ -420,7 +420,7 @@ def lambda_handler(event, context):
                     label=output_const.TASK1_API_WRONG_LABEL,
                     value=output_const.TASK1_API_WRONG_VALUE,
                     dashboard_index=output_const.TASK1_API_WRONG_INDEX,
-                    markdown=output_const.TASK1_API_WRONG_INDEX,
+                    markdown=output_const.TASK1_API_WRONG_MARKDOWN,
                 )
 
                 quests_api_client.post_score_event(
@@ -434,7 +434,7 @@ def lambda_handler(event, context):
             print(f"Error while handling team update request: {err}")
 
     # Task 2 Website Release 
-    if (event['key'] == input_const.TASK2_LAUNCH_KEY and not team_data['is-website-released'] and team_data['ld-api-key-completed'] == True):
+    elif (event['key'] == input_const.TASK2_LAUNCH_KEY and not team_data['is-website-released'] and team_data['ld-api-key-completed'] == True):
         print("Evaluating Task 2")
 
         task2_Score_Lock = team_data['task2-score-locked']
