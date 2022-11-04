@@ -253,7 +253,7 @@ Resources:
     Properties:
       Handler: "load_id_creds.lambda_handler"
       Runtime: python3.9
-      Timeout: '30'
+      Timeout: '600'
       Code:
         S3Bucket: !Ref DeployAssetsBucket
         S3Key: !Join
