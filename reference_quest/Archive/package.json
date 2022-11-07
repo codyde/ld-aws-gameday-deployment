@@ -1,0 +1,35 @@
+{
+  "name": "ld-summit-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build && next export",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@babel/core": "^7.15.0",
+    "dotenv": "^16.0.2",
+    "launchdarkly-react-client-sdk": "^2.23.0",
+    "local-storage": "^2.0.0",
+    "next": "^12.3.1",
+    "radium": "^0.26.1",
+    "react": "^17.0.2",
+    "react-animations": "^1.0.0",
+    "react-device-detect": "^2.1.2",
+    "react-dom": "17.0.2",
+    "react-hot-toast": "^2.1.1",
+    "react-syntax-highlighter": "^15.5.0",
+    "semantic-ui-css": "^2.4.1",
+    "semantic-ui-react": "^2.0.3",
+    "styled-components": "^5.3.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.0",
+    "eslint": "7.32.0",
+    "eslint-config-next": "11.1.0",
+    "postcss": "^8.3.11",
+    "tailwindcss": "^2.2.19"
+  }
+}

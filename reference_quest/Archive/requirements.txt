@@ -1,0 +1,15 @@
+launchdarkly-server-sdk
+requests
+datetime
+flask
+flask-sqlalchemy
+flask_cors
+flask_session
+flask-session
+uwsgi
+gevent
+gunicorn==20.1.0 
+eventlet==0.30.2
+python-dotenv
+uuid
+boto3

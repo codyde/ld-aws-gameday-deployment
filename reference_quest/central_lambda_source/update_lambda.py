@@ -440,7 +440,7 @@ def lambda_handler(event, context):
         task2_Score_Lock = team_data['task2-score-locked']
         if not task2_Score_Lock:
             team_data['task2-score-locked'] = True
-            input_value = event['value']
+            input_value = event['value'].strip('"')
             print("The input value is "+input_value)
             team_data['task2-attempted'] = True
             team_data['app-version'] = input_value
