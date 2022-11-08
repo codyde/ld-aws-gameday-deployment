@@ -18,7 +18,7 @@ QUEST_API_TOKEN = os.environ['QUEST_API_TOKEN']
 GAMEDAY_REGION = os.environ['GAMEDAY_REGION']
 ASSETS_BUCKET = os.environ['ASSETS_BUCKET']
 ASSETS_BUCKET_PREFIX = os.environ['ASSETS_BUCKET_PREFIX']
-TEAM_SSM_PARAMS_NEEDED=['LD-ServerKey','LD-ClientKey','LD-SignOnUrl','TableNumber']
+TEAM_SSM_PARAMS_NEEDED=['LD-ServerKey','LD-ClientKey','LD-SignOnUrl']     #,'TableNumber']
 
 http = urllib3.PoolManager()
 def lambda_handler(event, context):
@@ -123,13 +123,13 @@ def lambda_handler(event, context):
                                                         Tier="Standard",
                                                         Type="String",
                                                         DataType="text")
-                            xa_ssm_client.put_parameter(Name='TableNumber',
-                                                        Description="Table Number of the Team",
-                                                        Value=launchdarkly_credentials['TEAM_ID'],
-                                                        Overwrite=True,
-                                                        Tier="Standard",
-                                                        Type="String",
-                                                        DataType="text")
+                            # xa_ssm_client.put_parameter(Name='TableNumber',
+                            #                             Description="Table Number of the Team",
+                            #                             Value=launchdarkly_credentials['TEAM_ID'],
+                            #                             Overwrite=True,
+                            #                             Tier="Standard",
+                            #                             Type="String",
+                            #                             DataType="text")
                             # xa_ssm_client.put_parameter(Name='LD-TeamEmail',
                             #                             Description="Table Number of the Team",
                             #                             Value=launchdarkly_credentials['TEAM_EMAIL'],
