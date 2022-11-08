@@ -16,7 +16,7 @@ TASK1_API_DESCRIPTION="ex: api-xxx-xxxxx-xxxx-xxxxx"
 
 TASK2_LAUNCH_KEY='task2_version'
 TASK2_LAUNCH_INDEX=21
-TASK2_LAUNCH_LABEL="What's the **app-version** value in the /status API endpoint?"
+TASK2_LAUNCH_LABEL="What's the **app-version** value in the App Runner's /status API endpoint?"
 TASK2_LAUNCH_DESCRIPTION="ex: v123"
 
 
@@ -30,5 +30,5 @@ TASK3_DEBUG_DESCRIPTION="ex: value"
 # TASK 4 - Database Migrated
 TASK4_MIGRATION_KEY='task4_version'
 TASK4_MIGRATION_INDEX=41
-TASK4_MIGRATION_LABEL="What's the **location** value in the /health API endpoint?"
+TASK4_MIGRATION_LABEL="What's the **location** value in the in the App Runner's /health API endpoint?"
 TASK4_MIGRATION_DESCRIPTION="ex: environment"

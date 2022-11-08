@@ -47,10 +47,10 @@ Parameters:
     Description: Server SDK Key for LaunchDarkly configuration
     Type: AWS::SSM::Parameter::Value<String>
 # I use this to query a Dynamo table that will be created in the central account that will have various validation values
-  TeamTableSsmParam:
-    Default: 'TableNumber'
-    Description: AWS Gameday Table Number
-    Type: AWS::SSM::Parameter::Value<String>
+#  TeamTableSsmParam:
+#    Default: 'TableNumber'
+#    Description: AWS Gameday Table Number
+#    Type: AWS::SSM::Parameter::Value<String>
 
 Resources: 
   # ╔══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
@@ -184,7 +184,7 @@ Resources:
             cfnresponse.send(event, context, cfnresponse.SUCCESS, response) 
       Environment:
         Variables:
-          TABLENUMBER: !Ref TeamTableSsmParam
+          TABLENUMBER: 1  #!Ref TeamTableSsmParam
       Handler: index.handler
       Role:
         Fn::GetAtt: [ LambdaRole , "Arn" ]
@@ -363,7 +363,7 @@ Resources:
             Value: !Ref LaunchDarklyServerKeySsmParam
             Type: PLAINTEXT
           - Name: TEAM_ID
-            Value: !Ref TeamTableSsmParam
+            Value: 1     #!Ref TeamTableSsmParam
             Type: PLAINTEXT
       Name: !Sub ${AWS::StackName}-image-build
       ServiceRole: !Ref CodePipelineServiceRole
