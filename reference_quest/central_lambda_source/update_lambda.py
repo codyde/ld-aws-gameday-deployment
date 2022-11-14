@@ -398,7 +398,7 @@ def lambda_handler(event, context):
                     description=hint_const.TASK2_HINT1_DESCRIPTION,
                     value=hint_const.TASK2_HINT1_VALUE,
                     dashboard_index=hint_const.TASK2_HINT1_INDEX,
-                    cost=hint_const.TASK1_HINT2_COST,
+                    cost=hint_const.TASK2_HINT1_COST,
                     status=hint_const.STATUS_OFFERED
                 )
 

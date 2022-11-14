@@ -5,9 +5,11 @@
 WELCOME_KEY="welcome"
 WELCOME_LABEL="Welcome to the (soon to be) NEW Unicorn.Rentals"
 WELCOME_VALUE="""
-At Unicorn.Rentals, we hire dreamers not just "techs”. We seek those who share our vision and are willing to put in extra hours to take our offering of mythical creatures to the next level. Our solutions are diverse and the things we are building are going to delight our users. 
+At Unicorn.Rentals, we hire dreamers who are willing to put in extra hours to take our offering of mythical creatures to the next level.
 
-But first... Unicorn.Rentals needs to deliver it's next generation, cloud hosted, marketing website! As the core team responsible for the deployment and migration, you'll ship the features that power Unicorn.Rentals new marketing website, and debug any problems that come up when the Unicorns break loose. Throughout this challenge you'll explore rolling out the new website, building feature flags, troubleshooting problems, and rolling out new capabilities... hopefully with no broken horns! 
+Now, Unicorn.Rentals needs to deliver its next generation, cloud hosted, hooftastic marketing website! As the core team responsible for the deployment and migration, 
+you'll ship the features that power Unicorn.Rental's new website, and debug any problems that come up when the Unicorns break loose. 
+Throughout this challenge you'll explore rolling out the new website, building feature flags, troubleshooting problems, and rolling out new capabilities... hopefully with no broken horns! 
 """
 WELCOME_INDEX=1
 WELCOME_MARKDOWN=True
@@ -18,21 +20,19 @@ TASK1_KEY="task1"
 TASK1_LABEL="Task 1 - Unicorns in the Clouds! Deploying the new Unicorn.Rentals!"
 TASK1_VALUE="""
 It's Day 1, your first build pipeline for the the new Unicorn.Rentals website is running currently. Roll up your sleeves, crack your knuckles, and get the application UP! 
-
-As the Cloud Administrator at Unicorn.Rentals, you need to deploy the image for the website using AWS App Runner.  
+Create a new AWS App Runner application using a container image of the brand new Marketing Website as follows:
 
 ## App Runner Configuration: 
 
-1. **Container Image URL** - Select **Browse** and type in `unicornrentalsapp` in the image list, choose the corresponding image. The image name will have have many additional characters in addition to `unicornrentalsapp` that is the correct one. If you do not see the image, check to see if you pipeline has finished building and refresh App Runner. 
-2. **ECR Access Role** - Select **Create new service role** and use the default name that appears.  
-3. **Service name** - Your choice! 
-4. **Environment Variables** - Create one called `LD_SERVER_KEY` and use the Server SDK key from above as the value 
-5. **Port** - Set it to `5000`
-6. **Security Tab > Instance role** - Set to `LDUnicornAppRunnerInstanceRole`
+1. **Container Image URL** - Browse for the `unicornrentalsapp` in the image list. If you do not see the image, wait for LaunchDarkly-app-pipeline CodePipeline to finish and refresh App Runner. 
+2. **ECR Access Role** - Select **Create new service role**, use defaults.  
+3. **Environment Variables** - Create one called `LD_SERVER_KEY` with the LD_SERVER_KEY listed above
+4. **Port** - Set it to `5000`
+5. **Security Tab > Instance role** - Set to `LDUnicornAppRunnerInstanceRole`
 
-When you complete the above steps, enter the name you created (**CASE SENSITIVE**) below to validate your configuration.
+When you're done entering the configuration and the application starts deploying, enter the name of the application (**CASE SENSITIVE**) below to validate your configuration. 
+Please note that you don't have to wait for the deployment to finish to provide your answer!
 
-**Note: Incorrect submissions will cost you!**
 """
 TASK1_INDEX=10
 TASK1_MARKDOWN=True
@@ -59,15 +59,14 @@ TASK1_APPRUNNER_INPUT_REMOVED_MARKDOWN=True
 
 
 TASK1_APPRUNNER_COMPLETE_KEY="task1_apprunner_complete"
-TASK1_APPRUNNER_COMPLETE_LABEL="Unicorn.Rentals is up and running!"
+TASK1_APPRUNNER_COMPLETE_LABEL="Unicorn.Rentals is deploying!"
 TASK1_APPRUNNER_COMPLETE_VALUE="""
 You created an App Runner deployment of the new marketing website, and its URL is or will be functional shortly (within 5-10 minutes). You are one step closer to having the site live and serving user traffic! 
 
-We're going to use LaunchDarkly to manage our feature releases separate from the deployment using [Feature Flags](https://launchdarkly.com/blog/what-are-feature-flags/).
+Now we're going to use LaunchDarkly to manage our feature releases separate from the deployment using [Feature Flags](https://launchdarkly.com/blog/what-are-feature-flags/).
 
-While the site is building, we need to acquire an API key that other teams can use to integrate with LaunchDarkly services. Navigate to LaunchDarkly and [create an API token](https://docs.launchdarkly.com/home/account-security/api-access-tokens#creating-api-access-tokens) using the `Custom Role` option with your student box checked, you don't need to change any other settings. Copy this API key and paste it below for the other teams at Unicorn.Rentals to use! 
+Let's make a new API key so that other teams can use it to integrate with LaunchDarkly services. Navigate to LaunchDarkly and [create an API token](https://docs.launchdarkly.com/home/account-security/api-access-tokens#creating-api-access-tokens) using the `Custom Role` option with your student box checked, you don't need to change any other settings. Copy this API key and paste it below for the other teams at Unicorn.Rentals to use! 
 
-It's time to start creating our feature flags and launching the **NEW** Unicorn.Rentals!
 """
 TASK1_APPRUNNER_COMPLETE_INDEX=13
 TASK1_APPRUNNER_COMPLETE_MARKDOWN=True
@@ -81,8 +80,8 @@ TASK1_API_WRONG_MARKDOWN=True
 
 # API Task addition
 TASK1_COMPLETE_KEY="task1_complete"
-TASK1_COMPLETE_LABEL="App is up, and API is good!"
-TASK1_COMPLETE_VALUE="The Unicorn.Rentals site is spinning up in AWS App Runner and the LaunchDarkly API key is validating successfully. You have all the tools in place now to begin releasing the Unicorn.Rentals site to end users!"
+TASK1_COMPLETE_LABEL="The API is good!"
+TASK1_COMPLETE_VALUE="The LaunchDarkly API key is validating successfully!"
 TASK1_COMPLETE_INDEX="18"
 TASK1_COMPLETE_MARKDOWN=True
 
@@ -90,14 +89,19 @@ TASK1_COMPLETE_MARKDOWN=True
 TASK2_KEY="task2"
 TASK2_LABEL="Task 2 - Releasing the new Unicorn.Rentals!"
 TASK2_VALUE="""
+🔥🔥For this task, ensure your App Runner application has finished deploying by checking its URL! 🔥🔥
+
 You just received a notification from the web development team that the new version of the Unicorn.Rentals website is ready for user testing! 
 
-They included a **[feature flag](https://launchdarkly.com/blog/what-are-feature-flags/)** in the new code that is preventing it from being seen by most users. It's now up to you to create a flag in [LaunchDarkly](https://app.launchdarkly.com) that allows users to see the new website. Here are your tasks: 
+The developers included a **[feature flag](https://launchdarkly.com/blog/what-are-feature-flags/)** in the new code that toggles the visibility of the new website. 
+Now you have to create a corresponding flag in [LaunchDarkly](https://app.launchdarkly.com) that allows your OPS team to switch the website to the newly released version. Here are your tasks: 
 
-1. Check the [application code](https://github.com/codyde/ld-aws-gameday/blob/db49c4be0791e2cb0a46c7d0f803ac078067644a/pages/index.js#L58) and locate the name of the flag and information about the flag.
-2. Use this information to create a feature flag in LaunchDarkly that will release the Unicorn.Rentals website.
+1. Check the [application code](https://github.com/codyde/ld-aws-gameday/blob/db49c4be0791e2cb0a46c7d0f803ac078067644a/pages/index.js#L58) and locate the info of the new website's release flag.
+2. Use this information to create a corresponding feature flag in LaunchDarkly.
+3. Enable the flag in LaunchDarkly by toggling Targeting to ON.
 
-Once the feature flag is enabled, you should see the new site! You'll also be able to access a new API on the `/status` route. Use that path to retrieve the version of Unicorn.Rentals that is running. We will verify that you have the correct version by validating value in the input box below.   
+Once your site release flag is enabled in LaunchDarkly, you should see the new site in your App Runner's URL! 
+
 """
 TASK2_INDEX=20
 TASK2_MARKDOWN=True
@@ -111,7 +115,9 @@ TASK2_UNRELEASED_MARKDOWN=True
 TASK2_COMPLETE_KEY="task2_complete"
 TASK2_COMPLETE_LABEL="The new Unicorn.Rentals is **LIVE** for user traffic!"
 TASK2_COMPLETE_VALUE="""
-Toggling the feature flag on for `siteRelease` has enabled the new version of the Unicorn.Rentals website, however, something looks wrong. You can see debug messages reflected in the card views on the main page. Looks like it's time to dig in and figure out what went wrong!
+Toggling the feature flag on for `siteRelease` has enabled the new version of the Unicorn.Rentals website... however, something looks wrong!? 
+
+Oh no, you can see debug messages reflected in the card views on the main page!!
 """
 TASK2_COMPLETE_INDEX=29
 TASK2_COMPLETE_MARKDOWN=True
@@ -121,12 +127,13 @@ TASK2_COMPLETE_MARKDOWN=True
 TASK3_KEY="task3"
 TASK3_LABEL="Task 3 - Uh, we've got a problem here. This data looks off."
 TASK3_VALUE="""
-Your team notices significant amounts of debug data on the newly released Unicorn.Rentals site. We could just turn off the flag and take the site down, but fortunately we have another option.
+Your team notices significant amounts of debug data on the newly released Unicorn.Rentals site. We could just turn off the flag and take the site down, but fortunately we have a better option.
 
-During development, the team added enhanced logging, behind a feature flag, for specific users. Enabling this flag will help those users to help isolate problems. For this task, we'll create a feature flag in LaunchDarkly and configure it to target to be our `debuguser`. For this task you'll need to:
+During development, the team added enhanced logging behind a feature flag, which will only be available to specific users. This can be quite handy for isolating problems. 
+For this task, we'll create a feature flag in LaunchDarkly and configure it so that only user `debuguser` sees the log messages. For this task you'll need to:
 
 1. Check the application code to find the feature flag configuration. You can use the [client-side code](https://github.com/codyde/ld-aws-gameday/blob/a383dbf064d081b841937b27b637519243726470/pages/index.js#L78) or the [server-side code](https://github.com/codyde/ld-aws-gameday/blob/6cfe5fc27d2d1a05d99cf815563ace17b504f2b1/main.py#L195) for this information. 
-2. In LaunchDarkly, create a [multi-variate feature flag](https://docs.launchdarkly.com/home/flags/variations) that matches the code. 
+2. In LaunchDarkly, create a [multi-variate feature flag](https://docs.launchdarkly.com/home/flags/variations) that matches the flag described in the code. 
 3. Create a [targeting rule](https://docs.launchdarkly.com/home/flags/targeting-users) that serves the `debug` feature for `debuguser` and serves the `default` rule to everyone else. 
 
 Once enabled, login as `debuguser` to view the administrative menu, you can enter the value from this UI menu or visit the `/teamdebug` route. Enter the `debugcode` value in the input below. 
@@ -147,9 +154,10 @@ TASK3_INCORRECT_MARKDOWN=True
 TASK3_COMPLETE_KEY="task3_complete"
 TASK3_COMPLETE_LABEL="Success! You found the debug answer!"
 TASK3_COMPLETE_VALUE="""
-Upon enabling the debug menu you have found that the application is still connecting to its local debug data. This data was left in place from previous development iterations and was meant to be swapped out! Similar to before, we COULD kill switch this feature and disable the website entirely, but fortunately our development team gave us another option. 
+Upon enabling the debug menu you have found that the application is still connecting to its local debug data. This data was left in place from previous development iterations and was meant to be swapped out! 
+Similar to before, we COULD kill switch this feature and disable the website entirely, but fortunately our development team gave us a better option. 
 
-The connectivity code for the database is in place and a feature flag is controlling it. We can use feature flags to rollout our database! Onto Task 4! 
+The connectivity code for the database has a feature flag controlling it. We can use feature flags to rollout our database! Onto Task 4! 
 """
 TASK3_COMPLETE_INDEX=39
 TASK3_COMPLETE_MARKDOWN=True
@@ -184,7 +192,8 @@ TASK4_CORRECT_LABEL="Look at that, our Unicorns are ALL CLOUDY NOW!"
 TASK4_CORRECT_VALUE="""
 Your migration is successful, you are now returning data to the Unicorn.Rentals UI from AWS DynamoDB!  
 
-In this example, we just made a hard switch to the new database, but with LaunchDarkly these changes can be made either gradually, or all at once. If we had discovered a problem with the database connection - we can disable the feature and return it back to the original code in milliseconds (the "kill switch").
+In this example, we just made a hard switch to the new database, but with LaunchDarkly these changes can be made either gradually, or all at once. 
+If we had discovered a problem with the database connection - we can disable the feature and return it back to the original code in milliseconds (the "kill switch").
 
 All in a days work for a Unicorn Admin!
 """

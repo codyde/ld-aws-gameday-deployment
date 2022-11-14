@@ -2,6 +2,7 @@
 # This file is Amazon Web Services Content and may not be duplicated or distributed without permission.
 
 # TASK 1
+
 WRONG_APPRUNNER_DESC="Bad App Runner URL"
 WRONG_APPRUNNER_POINTS=-2000
 
@@ -29,6 +30,7 @@ UNRELEASED_DESC="Users are still unable to access the new Unicorn.Rentals. The w
 UNRELEASED_POINTS=-2000
 
 
+
 # TASK 3
 DEBUG_WRONG_DESC="Our data is missing!"
 DEBUG_WRONG_POINTS=-2000
@@ -45,7 +47,9 @@ MIGRATION_SUCCESS_DESC="Hey look! It's the right data!"
 MIGRATION_SUCCESS_POINTS=40000
 
 
+
 # QUEST COMPLETION
 QUEST_COMPLETE_DESC="Quest completed"
 QUEST_COMPLETE_POINTS=30000
+
 
