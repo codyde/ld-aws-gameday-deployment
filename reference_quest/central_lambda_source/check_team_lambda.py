@@ -386,27 +386,27 @@ def check_and_complete_quest(quests_api_client, quest_id, team_data):
         # )
 
         # # Award quest complete bonus points
-        # bonus_points = calculate_bonus_points(quests_api_client, quest_id, team_data)
-        # quests_api_client.post_score_event(
-        #     team_id=team_data["team-id"],
-        #     quest_id=quest_id,
-        #     description=scoring_const.QUEST_COMPLETE_BONUS_DESC,
-        #     points=bonus_points
-        # )
+        bonus_points = calculate_bonus_points(quests_api_client, quest_id, team_data)
+        quests_api_client.post_score_event(
+            team_id=team_data["team-id"],
+            quest_id=quest_id,
+            description=scoring_const.QUEST_COMPLETE_DESC,
+            points=bonus_points
+        )
 
         # # Post quest complete message
-        # quests_api_client.post_output(
-        #     team_id=team_data['team-id'],
-        #     quest_id=quest_id,
-        #     key=output_const.QUEST_COMPLETE_KEY,
-        #     label=output_const.QUEST_COMPLETE_LABEL,
-        #     value=output_const.QUEST_COMPLETE_VALUE,
-        #     dashboard_index=output_const.QUEST_COMPLETE_INDEX,
-        #     markdown=output_const.QUEST_COMPLETE_MARKDOWN,
-        # )
+        quests_api_client.post_output(
+            team_id=team_data['team-id'],
+            quest_id=quest_id,
+            key=output_const.QUEST_COMPLETE_KEY,
+            label=output_const.QUEST_COMPLETE_LABEL,
+            value=output_const.QUEST_COMPLETE_VALUE,
+            dashboard_index=output_const.QUEST_COMPLETE_INDEX,
+            markdown=output_const.QUEST_COMPLETE_MARKDOWN,
+        )
 
-        # # Complete quest
-        # quests_api_client.post_quest_complete(team_id=team_data['team-id'], quest_id=quest_id)
+        # Complete quest
+        quests_api_client.post_quest_complete(team_id=team_data['team-id'], quest_id=quest_id)
 
         return True
 
@@ -437,12 +437,10 @@ def is_chaos_timer_up(timer_start_time, timer_minutes):
 
     return False
 
-
 # Calculate quest completion bonus points
 # This is to reward teams that complete the quest faster
 def calculate_bonus_points(quests_api_client, quest_id, team_data):
     quest = quests_api_client.get_quest_for_team(team_data['team-id'], quest_id)
-
     # Get quest start time
     start_time = datetime.fromtimestamp(quest['quest-start-time'])
 
@@ -453,8 +451,10 @@ def calculate_bonus_points(quests_api_client, quest_id, team_data):
     time_diff = end_time - start_time
     minutes = int(time_diff.total_seconds() / 60)
 
-    # Calculate bonus points based on elapsed time
-    bonus_points = int(scoring_const.QUEST_COMPLETE_POINTS / minutes * scoring_const.QUEST_COMPLETE_MULTIPLIER)
+    # Calculate points based on elapsed time
+    bonus_points = (scoring_const.QUEST_COMPLETE_POINTS - (minutes * 100))
+    if bonus_points < 1000:
+        bonus_points = 1000 # leave minimum completion points
     print(f"Bonus points on {scoring_const.QUEST_COMPLETE_POINTS} done in {minutes} minutes: {bonus_points}")
 
     return bonus_points

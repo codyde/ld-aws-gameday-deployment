@@ -46,7 +46,7 @@ TASK1_CREDS_MARKDOWN=True
 TASK1_APPRUNNER_WRONG_KEY="task1_bad_app"
 TASK1_APPRUNNER_WRONG_LABEL="Well - there's nothing here"
 TASK1_APPRUNNER_WRONG_VALUE="""
-Uh oh! The App Runner name you entered isn't returning any data! Its possible that you used the wrong case int he name, or just a simple hoof-typo. Happens to the best unicorns. Sorry about the points loss! Head over to **App Runner** in your AWS account and give it another try.
+Uh oh! The App Runner name you entered isn't returning any data! Its possible that you used the wrong case int the name, or just a simple hoof-typo. Happens to the best unicorns. Sorry about the points loss! Head over to **App Runner** in your AWS account and give it another try.
 """ 
 TASK1_APPRUNNER_WRONG_INDEX=11
 TASK1_APPRUNNER_WRONG_MARKDOWN=True
@@ -61,8 +61,7 @@ TASK1_APPRUNNER_INPUT_REMOVED_MARKDOWN=True
 TASK1_APPRUNNER_COMPLETE_KEY="task1_apprunner_complete"
 TASK1_APPRUNNER_COMPLETE_LABEL="Unicorn.Rentals is deploying!"
 TASK1_APPRUNNER_COMPLETE_VALUE="""
-Unicorn.Rentals is in the process of deploying. You created an App Runner deployment of the new marketing website, and its URL will be functional shortly (within 5-10 minutes). 
-You are one step closer to having the site live and serving user traffic! 
+You created an App Runner deployment of the new marketing website, and its URL is or will be functional shortly (within 5-10 minutes). You are one step closer to having the site live and serving user traffic! 
 
 Now we're going to use LaunchDarkly to manage our feature releases separate from the deployment using [Feature Flags](https://launchdarkly.com/blog/what-are-feature-flags/).
 
