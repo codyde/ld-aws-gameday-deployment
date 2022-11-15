@@ -61,7 +61,7 @@ TASK1_APPRUNNER_INPUT_REMOVED_MARKDOWN=True
 TASK1_APPRUNNER_COMPLETE_KEY="task1_apprunner_complete"
 TASK1_APPRUNNER_COMPLETE_LABEL="Unicorn.Rentals is deploying!"
 TASK1_APPRUNNER_COMPLETE_VALUE="""
-You created an App Runner deployment of the new marketing website, and its URL is or will be functional shortly (within 5-10 minutes). You are one step closer to having the site live and serving user traffic! 
+You created an App Runner deployment of the new marketing website, and the URL for the new page is, or will shortly be, functional (within 5-10 minutes). You are one step closer to having the site live and serving user traffic! 
 
 Now we're going to use LaunchDarkly to manage our feature releases separate from the deployment using [Feature Flags](https://launchdarkly.com/blog/what-are-feature-flags/).
 
@@ -73,15 +73,15 @@ TASK1_APPRUNNER_COMPLETE_MARKDOWN=True
 
 # API Task addition
 TASK1_API_WRONG_KEY="task1_bad_api"
-TASK1_API_WRONG_LABEL="This API key doesn't appear valid"
+TASK1_API_WRONG_LABEL="This API key doesn't appear to be valid"
 TASK1_API_WRONG_VALUE="When our Unicorns tried to check the API key, it didn't return valid data. Check that you've created the API key with the correct role, and that you copied the correct key value."
 TASK1_API_WRONG_INDEX="17"
 TASK1_API_WRONG_MARKDOWN=True
 
 # API Task addition
 TASK1_COMPLETE_KEY="task1_complete"
-TASK1_COMPLETE_LABEL="The API is good!"
-TASK1_COMPLETE_VALUE="The LaunchDarkly API key is validating successfully!"
+TASK1_COMPLETE_LABEL="The API key is good!"
+TASK1_COMPLETE_VALUE="You've successfully created a new API Key for calling LaunchDarkly! We'll need this to verify that our flags are working properly and have the correct values in the upcoming steps."
 TASK1_COMPLETE_INDEX="18"
 TASK1_COMPLETE_MARKDOWN=True
 
@@ -89,7 +89,7 @@ TASK1_COMPLETE_MARKDOWN=True
 TASK2_KEY="task2"
 TASK2_LABEL="Task 2 - Releasing the new Unicorn.Rentals!"
 TASK2_VALUE="""
-🔥🔥For this task, ensure your App Runner application has finished deploying by checking its URL! 🔥🔥
+🔥🔥Before you start this task, check that your App Runner application has finished deploying by checking its URL! 🔥🔥
 
 You just received a notification from the web development team that the new version of the Unicorn.Rentals website is ready for user testing! 
 
@@ -134,7 +134,7 @@ For this task, we'll create a feature flag in LaunchDarkly and configure it so t
 
 1. Check the application code to find the feature flag configuration. You can use the [client-side code](https://github.com/codyde/ld-aws-gameday/blob/a383dbf064d081b841937b27b637519243726470/pages/index.js#L78) or the [server-side code](https://github.com/codyde/ld-aws-gameday/blob/6cfe5fc27d2d1a05d99cf815563ace17b504f2b1/main.py#L195) for this information. 
 2. In LaunchDarkly, create a [multi-variate feature flag](https://docs.launchdarkly.com/home/flags/variations) that matches the flag described in the code. 
-3. Create a [targeting rule](https://docs.launchdarkly.com/home/flags/targeting-users) that serves the `debug` feature for `debuguser` and serves the `default` rule to everyone else. 
+3. Create a [targeting rule](https://docs.launchdarkly.com/home/flags/targeting-users) that serves the `debug` feature for `debuguser` and serves the `default` rule to everyone else. (**Hint:** make sure you specify that only the `debuguser` sees the `debug` feature by default!) 
 
 Once enabled, login as `debuguser` to view the administrative menu, you can enter the value from this UI menu or visit the `/teamdebug` route. Enter the `debugcode` value in the input below. 
 """
@@ -145,7 +145,7 @@ TASK3_MARKDOWN=True
 TASK3_INCORRECT_KEY="task3_incorrect"
 TASK3_INCORRECT_LABEL="The status code you entered is invalid or your targeting rule is missing"
 TASK3_INCORRECT_VALUE="""
-We need the status code, and to ensure that only our targeting unicorn, `debuguser`, is receiving the logMode. It appears that either the status code value that you showed is incorrect, or your targeting rule is missing for this feature flag. Ensure you've created the correct feature flag of `logMode`, targeted the `debuguser` with the `debug` value, and enabled the feature flag.
+We need the status code, but remember we only want the `debuguser` unicorn to see it! It appears that either the status code value that you showed is incorrect, or your targeting rule is missing for this feature flag. Ensure you've created the correct feature flag of `logMode`, targeted the `debuguser` with the `debug` value, and enabled the feature flag.
 """
 TASK3_INCORRECT_INDEX=35
 TASK3_INCORRECT_MARKDOWN=True
