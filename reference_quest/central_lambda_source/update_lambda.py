@@ -32,6 +32,7 @@ QUEST_TEAM_STATUS_TABLE = os.environ['QUEST_TEAM_STATUS_TABLE']
 dynamodb = boto3.resource('dynamodb')
 quest_team_status_table = dynamodb.Table(QUEST_TEAM_STATUS_TABLE)
 
+
 def check_webapp(apprunnerurl):
     try:
         print(f"Testing web app status using URL {apprunnerurl}")
@@ -47,10 +48,12 @@ def check_webapp(apprunnerurl):
         print(f"Web app not available: {e}")
         return False
 
-def check_apprunner(apprunnername):
+
+def check_apprunner(apprunnername, quests_api_client, team_id):
     try:
-        client = boto3.client('apprunner')
-        arsvc=client.list_services()
+        xa_session = quests_api_client.assume_team_ops_role(team_id)
+        client = xa_session.client('apprunner')
+        arsvc = client.list_services()
         print(arsvc)
         for i in arsvc['ServiceSummaryList']:
             if i['ServiceName'] == apprunnername:
@@ -58,17 +61,19 @@ def check_apprunner(apprunnername):
     except Exception as e:
         print(f"Unable to connect: {e}")
         return False
-        
-def get_apprunner_url(apprunnername):
+
+
+def get_apprunner_url(apprunnername, quests_api_client, team_id):
     try:
-        client = boto3.client('apprunner')
-        arsvc=client.list_services()
+        xa_session = quests_api_client.assume_team_ops_role(team_id)
+        client = xa_session.client('apprunner')
+        arsvc = client.list_services()
         print(arsvc)
         for i in arsvc['ServiceSummaryList']:
             if i['ServiceName'] == apprunnername:
                 svcarn = i['ServiceArn']
         svcurl = 'https://' + client.describe_service(ServiceArn=svcarn)['Service']['ServiceUrl']
-        return svcurl 
+        return svcurl
     except Exception as e:
         print(f"Unable to connect: {e}")
 
@@ -89,7 +94,7 @@ def get_ld_project(apikey):
         headers = {"Authorization": apikey}
         r = requests.get(url, headers=headers)
         projkey = r.json()['items'][0]['key']
-        print("The LaunchDarkly project is "+projkey)
+        print("The LaunchDarkly project is " + projkey)
         return projkey
     except Exception as e:
         print(f"Unable to connect: {e}")
@@ -113,7 +118,7 @@ def getlogModeTargeting(team_data):
 def getAppRelease(team_data):
     try:
         print(f"Getting current version via API")
-        conn = requests.get(team_data['app-runner-url']+'/status')
+        conn = requests.get(team_data['app-runner-url'] + '/status')
         data = conn.json()
         print(data['app-version'])
         if data['app-version'] == team_data['app-version']:
@@ -127,7 +132,7 @@ def getAppRelease(team_data):
 def getDebugValue(team_data):
     try:
         print(f"Getting debug value via the /teamdebug API")
-        conn = requests.get(team_data['app-runner-url']+'/teamdebug')
+        conn = requests.get(team_data['app-runner-url'] + '/teamdebug')
         res = conn.json()
         print(res['debugcode'])
         if res['debugcode'] == team_data['debugcode']:
@@ -141,7 +146,7 @@ def getDebugValue(team_data):
 def getMigrationValue(team_data):
     try:
         print(f"Getting debug value via the /health API")
-        conn = requests.get(team_data['app-runner-url']+'/health')
+        conn = requests.get(team_data['app-runner-url'] + '/health')
         res = conn.json()
         print(res['location'])
         if res['location'] == team_data['migration-location']:
@@ -199,9 +204,9 @@ def lambda_handler(event, context):
     if (event['key'] == input_const.TASK1_ENDPOINT_KEY
         and not team_data['is-webapp-up'] and not team_data['ld-api-key-completed']): # This second check is needed to avoid multiple submissions since points are being given here
         try:
-            print("prior apprunner url value is "+team_data['app-runner-url'])
-            input_value = event['value'] 
-            print("event value is "+event['value'])
+            print("prior apprunner url value is " + team_data['app-runner-url'])
+            input_value = event['value']
+            print("event value is " + event['value'])
             team_data['monitoring-chaos-timer'] = int(datetime.now().timestamp())
             print("setting task1-attempted to True")
             team_data['task1-attempted'] = True
@@ -213,34 +218,34 @@ def lambda_handler(event, context):
             # Delete input since cannot be updated as task can be started only once
             # quests_api_client.delete_input(
             #     team_id=team_data["team-id"],
-            #     quest_id=QUEST_ID, 
+            #     quest_id=QUEST_ID,
             #     key=input_const.TASK1_ENDPOINT_KEY
             # )
 
-            apphealth = check_apprunner(input_value)
+            apphealth = check_apprunner(input_value, quests_api_client, team_data['team-id'])
 
             if apphealth == True:
                 print(f"Setting team_data is-webapp-up True, url, and updating Dynamo")
                 team_data['is-webapp-up'] = True
-                team_data['app-runner-url'] = get_apprunner_url(input_value)
+                team_data['app-runner-url'] = get_apprunner_url(input_value, quests_api_client, team_data['team-id'])
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
 
                 quests_api_client.delete_input(
                     team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
+                    quest_id=QUEST_ID,
                     key=input_const.TASK1_ENDPOINT_KEY
                 )
-                              
+
                 # Delete app down message if present
                 quests_api_client.delete_output(
                     team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
+                    quest_id=QUEST_ID,
                     key=output_const.TASK1_APPRUNNER_WRONG_KEY
                 )
 
                 quests_api_client.delete_hint(
                     team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
+                    quest_id=QUEST_ID,
                     hint_key=hint_const.TASK1_HINT1_KEY,
                     detail=True
                 )
@@ -270,7 +275,7 @@ def lambda_handler(event, context):
                     points=scoring_const.CORRECT_APPRUNNER_POINTS
                 )
 
-            else: 
+            else:
                 if team_data['task1-attempted']:
                     print(f"The web application for team {team_data['team-id']} is DOWN")
                     print(f"Resetting app-runner-url to try again and updating Dynamo")
@@ -287,7 +292,7 @@ def lambda_handler(event, context):
                         description=input_const.TASK1_ENDPOINT_DESCRIPTION,
                         dashboard_index=input_const.TASK1_ENDPOINT_INDEX
                     )
-                
+
                     quests_api_client.post_output(
                         team_id=team_data['team-id'],
                         quest_id=QUEST_ID,
@@ -324,8 +329,8 @@ def lambda_handler(event, context):
                         points=scoring_const.WRONG_APPRUNNER_POINTS
                     )
 
-                # Assuming they havent yet 
-                else: 
+                # Assuming they havent yet
+                else:
                     print("Not attempted yet; doing nothing")
 
         except Exception as err:
@@ -333,7 +338,7 @@ def lambda_handler(event, context):
 
     elif (event['key'] == input_const.TASK1_API_KEY and not team_data['ld-api-key-completed']):
         try:
-            print("Adding api key "+event['value']+" to quest")
+            print("Adding api key " + event['value'] + " to quest")
             team_data['ld-api-key'] = event['value']
 
             if check_apikey(team_data['ld-api-key']) == True:
@@ -344,7 +349,7 @@ def lambda_handler(event, context):
 
                 quests_api_client.delete_input(
                     team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
+                    quest_id=QUEST_ID,
                     key=input_const.TASK1_API_KEY
                 )
 
@@ -433,7 +438,7 @@ def lambda_handler(event, context):
         except Exception as err:
             print(f"Error while handling team update request: {err}")
 
-    # Task 2 Website Release 
+    # Task 2 Website Release
     elif (event['key'] == input_const.TASK2_LAUNCH_KEY and not team_data['is-website-released'] and team_data['ld-api-key-completed'] == True):
         print("Evaluating Task 2")
 
@@ -441,41 +446,41 @@ def lambda_handler(event, context):
         if not task2_Score_Lock:
             team_data['task2-score-locked'] = True
             input_value = event['value'].strip('"')
-            print("The input value is "+input_value)
+            print("The input value is " + input_value)
             team_data['task2-attempted'] = True
             team_data['app-version'] = input_value
             released_version = getAppRelease(team_data)
-            print("The value is the app status is "+str(released_version))
+            print("The value is the app status is " + str(released_version))
             dynamodb_utils.save_team_data(team_data, quest_team_status_table)
             if released_version:
                 team_data['is-website-released'] = True
                 team_data['start-task-3'] = True
                 print("writing updated task2 value")
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
-                
+
                 print("Task 2 - Checking for errors and deleting if there is")
-                
+
                 print("unlocking task2 score lock")
                 team_data['task2-score-locked'] = False
 
                 print("Removing input and locking the scoring")
                 quests_api_client.delete_input(
                     team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
+                    quest_id=QUEST_ID,
                     key=input_const.TASK2_LAUNCH_KEY
                 )
-                
+
                 print("Trying to delete unlreased error")
                 quests_api_client.delete_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
                     key=output_const.TASK2_UNRELEASED_KEY,
                 )
-                
+
                 print("Deleting hint")
                 quests_api_client.delete_hint(
                     team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
+                    quest_id=QUEST_ID,
                     hint_key=hint_const.TASK2_HINT1_KEY,
                     detail=True
                 )
@@ -526,12 +531,12 @@ def lambda_handler(event, context):
                     points=scoring_const.COMPLETE_POINTS
                 )
 
-            else: 
+            else:
                 print("resetting app-version")
                 team_data['app-version'] = 'unknown'
                 print("writing values to Dynamo")
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
-                
+
                 quests_api_client.post_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
@@ -543,7 +548,7 @@ def lambda_handler(event, context):
                 )
 
                 team_data['task2-score-locked'] = False
-                
+
                 print("Deleting task lock message")
                 quests_api_client.delete_output(
                     team_id=team_data['team-id'],
@@ -570,14 +575,14 @@ def lambda_handler(event, context):
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
         else:
             quests_api_client.post_output(
-                    team_id=team_data['team-id'],
-                    quest_id=QUEST_ID,
-                    key="task2_score_lock",
-                    label="Input Locked",
-                    value="It looks like a value has already been submitted - scoring is locked. Patience is a virtue",
-                    dashboard_index=14,
-                    markdown=True,
-                )
+                team_id=team_data['team-id'],
+                quest_id=QUEST_ID,
+                key="task2_score_lock",
+                label="Input Locked",
+                value="It looks like a value has already been submitted - scoring is locked. Patience is a virtue",
+                dashboard_index=14,
+                markdown=True,
+            )
 
     # Task 3 Debug Mode Enablement
     elif event['key'] == input_const.TASK3_DEBUG_KEY and not team_data['is-debug-mode'] and not team_data['task3-score-locked']: # run if debug mode is false and task lock is off
@@ -594,27 +599,27 @@ def lambda_handler(event, context):
 
                 quests_api_client.delete_input(
                     team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
+                    quest_id=QUEST_ID,
                     key=input_const.TASK3_DEBUG_KEY
                 )
 
                 quests_api_client.delete_output(
-                        team_id=team_data['team-id'],
-                        quest_id=QUEST_ID,
-                        key=output_const.TASK3_INCORRECT_KEY,
-                    )
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=output_const.TASK3_INCORRECT_KEY,
+                )
 
                 quests_api_client.post_output(
-                        team_id=team_data['team-id'],
-                        quest_id=QUEST_ID,
-                        key=output_const.TASK3_COMPLETE_KEY,
-                        label=output_const.TASK3_COMPLETE_LABEL,
-                        value=output_const.TASK3_COMPLETE_VALUE,
-                        dashboard_index=output_const.TASK3_COMPLETE_INDEX,
-                        markdown=output_const.TASK3_COMPLETE_MARKDOWN,
-                    )
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=output_const.TASK3_COMPLETE_KEY,
+                    label=output_const.TASK3_COMPLETE_LABEL,
+                    value=output_const.TASK3_COMPLETE_VALUE,
+                    dashboard_index=output_const.TASK3_COMPLETE_INDEX,
+                    markdown=output_const.TASK3_COMPLETE_MARKDOWN,
+                )
 
-                
+
                 team_data['is-debug-mode'] = True
 
                 # Post Task 4 info
@@ -648,36 +653,36 @@ def lambda_handler(event, context):
 
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
             else:
-                print("Value was wrong - setting reset sequence") 
+                print("Value was wrong - setting reset sequence")
                 print("Removing score lock for Task 3")
                 team_data['task3-score-locked'] = False
                 team_data['debugCode'] = 'unknown'
-                
+
                 quests_api_client.post_output(
-                        team_id=team_data['team-id'],
-                        quest_id=QUEST_ID,
-                        key=output_const.TASK3_INCORRECT_KEY,
-                        label=output_const.TASK3_INCORRECT_LABEL,
-                        value=output_const.TASK3_INCORRECT_VALUE,
-                        dashboard_index=output_const.TASK3_INCORRECT_INDEX,
-                        markdown=output_const.TASK3_INCORRECT_MARKDOWN,
-                    )
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=output_const.TASK3_INCORRECT_KEY,
+                    label=output_const.TASK3_INCORRECT_LABEL,
+                    value=output_const.TASK3_INCORRECT_VALUE,
+                    dashboard_index=output_const.TASK3_INCORRECT_INDEX,
+                    markdown=output_const.TASK3_INCORRECT_MARKDOWN,
+                )
 
                 quests_api_client.post_input(
-                        team_id=team_data['team-id'],
-                        quest_id=QUEST_ID,
-                        key=input_const.TASK3_DEBUG_KEY,
-                        label=input_const.TASK3_DEBUG_LABEL,
-                        description=input_const.TASK3_DEBUG_DESCRIPTION,
-                        dashboard_index=input_const.TASK3_DEBUG_INDEX
-                    )  
+                    team_id=team_data['team-id'],
+                    quest_id=QUEST_ID,
+                    key=input_const.TASK3_DEBUG_KEY,
+                    label=input_const.TASK3_DEBUG_LABEL,
+                    description=input_const.TASK3_DEBUG_DESCRIPTION,
+                    dashboard_index=input_const.TASK3_DEBUG_INDEX
+                )
 
                 quests_api_client.post_score_event(
-                        team_id=team_data["team-id"],
-                        quest_id=QUEST_ID,
-                        description=scoring_const.DEBUG_WRONG_DESC,
-                        points=scoring_const.DEBUG_WRONG_POINTS
-                    )
+                    team_id=team_data["team-id"],
+                    quest_id=QUEST_ID,
+                    description=scoring_const.DEBUG_WRONG_DESC,
+                    points=scoring_const.DEBUG_WRONG_POINTS
+                )
 
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
 
@@ -696,15 +701,15 @@ def lambda_handler(event, context):
             team_data['migration-location'] = value
             migrated = getMigrationValue(team_data)
             if migrated == True:
-                
+
                 print("Deleting the Task4 Input")
                 quests_api_client.delete_input(
                     team_id=team_data["team-id"],
-                    quest_id=QUEST_ID, 
+                    quest_id=QUEST_ID,
                     key=input_const.TASK4_MIGRATION_KEY
                 )
 
-                # Delete error if it exists 
+                # Delete error if it exists
                 print("Setting DB Migrated to True")
                 team_data['is-db-migrated'] = True
 
@@ -777,7 +782,7 @@ def lambda_handler(event, context):
                     dashboard_index=output_const.TASK4_WRONG_INDEX,
                     markdown=output_const.TASK4_WRONG_MARKDOWN,
                 )
-                
+
                 team_data['migration-location'] = 'unknown'
                 team_data['task4-score-locked'] = False
 
@@ -796,7 +801,7 @@ def lambda_handler(event, context):
                     description=scoring_const.MIGRATION_FAILED_DESC,
                     points=scoring_const.MIGRATION_FAILED_POINTS
                 )
-                    
+
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
 
         except Exception as err:
