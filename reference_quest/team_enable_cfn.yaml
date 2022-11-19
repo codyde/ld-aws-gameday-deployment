@@ -166,10 +166,13 @@ Resources:
                 'debugcode': '1100101',
                 'title1':'Unicorn with Confidence',
                 'text1':'Because you can always be confident when Unicorn.Rentals is providing your Unicorn.',
+                'image1': './unicorn-mane.jpg',
                 'title2':'Mythically Reliabile',
                 'text2':"If you can't trust that your Unicorn is going to be available when you ask for it, what can you really trust in this world?",
+                'image2':'./unicorn-rainbow.jpg',
                 'title3':'Automagic Unicornation',
                 'text3':'The Unicorn is neither missing nor present. Its Automagic. It arrives when it needs to be there, and not a second before.',
+                'image3':'./unicorn-dab.jpg'
                 }
             )
 

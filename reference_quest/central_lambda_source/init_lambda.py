@@ -95,15 +95,18 @@ def lambda_handler(event, context):
     print(f"Created team {team_id} in {QUEST_TEAM_STATUS_TABLE}. Response: {json.dumps(dynamo_put_response, default=str)}")
 
     # Post welcome message to the team
+    unicorn = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}unicorn.png", signed_duration=86400)
+
     quests_api_client.post_output(
         team_id=team_id,
         quest_id=QUEST_ID,
         key=output_const.WELCOME_KEY,
         label=output_const.WELCOME_LABEL,
-        value=output_const.WELCOME_VALUE,
+        value=output_const.WELCOME_VALUE.format(unicorn),
         dashboard_index=output_const.WELCOME_INDEX,
         markdown=output_const.WELCOME_MARKDOWN,
     )
+    soon = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}soon.png", signed_duration=86400)
 
     # Post task 1 instructions
     quests_api_client.post_output(
@@ -111,7 +114,7 @@ def lambda_handler(event, context):
         quest_id=QUEST_ID,
         key=output_const.TASK1_KEY,
         label=output_const.TASK1_LABEL,
-        value=output_const.TASK1_VALUE.format(GAMEDAY_REGION),
+        value=output_const.TASK1_VALUE.format(soon),
         dashboard_index=output_const.TASK1_INDEX,
         markdown=output_const.TASK1_MARKDOWN,
     )

@@ -22,8 +22,8 @@ QUEST_ID = os.environ['QUEST_ID']
 QUEST_API_BASE = os.environ['QUEST_API_BASE']
 QUEST_API_TOKEN = os.environ['QUEST_API_TOKEN']
 GAMEDAY_REGION = os.environ['GAMEDAY_REGION']
-# ASSETS_BUCKET = os.environ['ASSETS_BUCKET']
-# ASSETS_BUCKET_PREFIX = os.environ['ASSETS_BUCKET_PREFIX']
+ASSETS_BUCKET = os.environ['ASSETS_BUCKET']
+ASSETS_BUCKET_PREFIX = os.environ['ASSETS_BUCKET_PREFIX']
 
 # Quest Environment Variables
 QUEST_TEAM_STATUS_TABLE = os.environ['QUEST_TEAM_STATUS_TABLE']
@@ -245,12 +245,14 @@ def lambda_handler(event, context):
                     detail=True
                 )
 
+                lddark = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}ld-dark.png", signed_duration=86400)
+
                 quests_api_client.post_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
                     key=output_const.TASK1_APPRUNNER_COMPLETE_KEY,
                     label=output_const.TASK1_APPRUNNER_COMPLETE_LABEL,
-                    value=output_const.TASK1_APPRUNNER_COMPLETE_VALUE,
+                    value=output_const.TASK1_APPRUNNER_COMPLETE_VALUE.format(lddark),
                     dashboard_index=output_const.TASK1_APPRUNNER_COMPLETE_INDEX,
                     markdown=output_const.TASK1_APPRUNNER_COMPLETE_MARKDOWN,
                 )
@@ -369,14 +371,14 @@ def lambda_handler(event, context):
                     dashboard_index=input_const.TASK2_LAUNCH_INDEX,
                 )
 
-                # image_url = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}curl.jpeg",signed_duration=86400)
+                siterelease = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}siterelease.png", signed_duration=86400)
 
                 quests_api_client.post_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
                     key=output_const.TASK2_KEY,
                     label=output_const.TASK2_LABEL,
-                    value=output_const.TASK2_VALUE,
+                    value=output_const.TASK2_VALUE.format(siterelease),
                     dashboard_index=output_const.TASK2_INDEX,
                     markdown=output_const.TASK2_MARKDOWN,
                 )
@@ -452,7 +454,7 @@ def lambda_handler(event, context):
                 team_data['start-task-3'] = True
                 print("writing updated task2 value")
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
-                
+      
                 print("Task 2 - Checking for errors and deleting if there is")
                 
                 print("unlocking task2 score lock")
@@ -481,12 +483,15 @@ def lambda_handler(event, context):
                 )
 
                 print("Posting complete output")
+
+                released = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}rentalsreleased.png", signed_duration=86400)
+
                 quests_api_client.post_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
                     key=output_const.TASK2_COMPLETE_KEY,
                     label=output_const.TASK2_COMPLETE_LABEL,
-                    value=output_const.TASK2_COMPLETE_VALUE,
+                    value=output_const.TASK2_COMPLETE_VALUE.format(released),
                     dashboard_index=output_const.TASK2_COMPLETE_INDEX,
                     markdown=output_const.TASK2_COMPLETE_MARKDOWN,
                 )
@@ -503,12 +508,14 @@ def lambda_handler(event, context):
                     dashboard_index=input_const.TASK3_DEBUG_INDEX
                 )
 
+                debug = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}debug.png", signed_duration=86400)
+
                 quests_api_client.post_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
                     key=output_const.TASK3_KEY,
                     label=output_const.TASK3_LABEL,
-                    value=output_const.TASK3_VALUE,
+                    value=output_const.TASK3_VALUE.format(debug),
                     dashboard_index=output_const.TASK3_INDEX,
                     markdown=output_const.TASK3_COMPLETE_MARKDOWN,
                 )
@@ -588,6 +595,7 @@ def lambda_handler(event, context):
             team_data['task3-attempted'] = True
             input_value = event['value']
             team_data['debugcode'] = input_value
+            print("Eval code submitted is "+team_data['debugcode'])
             debugstatus = getDebugValue(team_data)
             targetingOn = getlogModeTargeting(team_data)
             if debugstatus == True and targetingOn == True:
@@ -616,14 +624,17 @@ def lambda_handler(event, context):
 
                 
                 team_data['is-debug-mode'] = True
+                dynamodb_utils.save_team_data(team_data, quest_team_status_table)
 
                 # Post Task 4 info
+
+                migration = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}migration.png", signed_duration=86400)
 
                 quests_api_client.post_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
                     key=output_const.TASK4_KEY,
-                    label=output_const.TASK4_LABEL,
+                    label=output_const.TASK4_LABEL.format(migration),
                     value=output_const.TASK4_VALUE,
                     dashboard_index=output_const.TASK4_INDEX,
                     markdown=output_const.TASK4_MARKDOWN,
@@ -652,6 +663,7 @@ def lambda_handler(event, context):
                 print("Removing score lock for Task 3")
                 team_data['task3-score-locked'] = False
                 team_data['debugCode'] = 'unknown'
+                dynamodb_utils.save_team_data(team_data, quest_team_status_table)
                 
                 quests_api_client.post_output(
                         team_id=team_data['team-id'],
@@ -715,12 +727,16 @@ def lambda_handler(event, context):
                     key=output_const.TASK4_WRONG_KEY,
                 )
                 print("Posting task4 is correct")
+
+                success = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}success.png", signed_duration=86400)
+
+
                 quests_api_client.post_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
                     key=output_const.TASK4_CORRECT_KEY,
                     label=output_const.TASK4_CORRECT_LABEL,
-                    value=output_const.TASK4_CORRECT_VALUE,
+                    value=output_const.TASK4_CORRECT_VALUE.format(success),
                     dashboard_index=output_const.TASK4_CORRECT_INDEX,
                     markdown=output_const.TASK4_CORRECT_MARKDOWN,
                 )

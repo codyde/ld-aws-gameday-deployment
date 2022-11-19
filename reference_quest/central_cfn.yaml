@@ -222,6 +222,8 @@ Resources:
           QUEST_API_BASE: !Ref gdQuestsAPIBase
           GAMEDAY_REGION: !Ref AWS::Region
           QUEST_TEAM_STATUS_TABLE: !Ref QuestTeamStatusTable
+          ASSETS_BUCKET: !Ref StaticAssetsBucket
+          ASSETS_BUCKET_PREFIX: !Ref StaticAssetsKeyPrefix
 
   CheckTeamLambda:
     Type: AWS::Lambda::Function

@@ -302,12 +302,15 @@ def evaluate_debug_mode(quests_api_client, team_data):
 
         if team_data['debugcode'] == 'unknown':
 
+            debug = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}debug.png", signed_duration=86400)
+
+
             quests_api_client.post_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
                     key=output_const.TASK3_KEY,
                     label=output_const.TASK3_LABEL,
-                    value=output_const.TASK3_VALUE,
+                    value=output_const.TASK3_VALUE.format(debug),
                     dashboard_index=output_const.TASK3_INDEX,
                     markdown=output_const.TASK3_MARKDOWN,
                 )

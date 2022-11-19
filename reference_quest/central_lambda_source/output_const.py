@@ -5,6 +5,8 @@
 WELCOME_KEY="welcome"
 WELCOME_LABEL="Welcome to the (soon to be) NEW Unicorn.Rentals"
 WELCOME_VALUE="""
+![Unicorn Rentals]({})
+
 At Unicorn.Rentals, we hire dreamers who are willing to put in extra hours to take our offering of mythical creatures to the next level.
 
 Now, Unicorn.Rentals needs to deliver its next generation, cloud hosted, hooftastic marketing website! As the core team responsible for the deployment and migration, 
@@ -19,6 +21,8 @@ WELCOME_MARKDOWN=True
 TASK1_KEY="task1"
 TASK1_LABEL="Task 1 - Unicorns in the Clouds! Deploying the new Unicorn.Rentals!"
 TASK1_VALUE="""
+![Soon]({})
+
 It's Day 1, your first build pipeline for the the new Unicorn.Rentals website is running currently. Roll up your sleeves, crack your knuckles, and get the application UP! 
 Create a new AWS App Runner application using a container image of the brand new Marketing Website as follows:
 
@@ -65,6 +69,10 @@ You created an App Runner deployment of the new marketing website, and its URL i
 
 Now we're going to use LaunchDarkly to manage our feature releases separate from the deployment using [Feature Flags](https://launchdarkly.com/blog/what-are-feature-flags/).
 
+
+![LD Dark]({})
+
+
 Let's make a new API key so that other teams can use it to integrate with LaunchDarkly services. Navigate to LaunchDarkly and [create an API token](https://docs.launchdarkly.com/home/account-security/api-access-tokens#creating-api-access-tokens) using the `Custom Role` option with your student box checked, you don't need to change any other settings. Copy this API key and paste it below for the other teams at Unicorn.Rentals to use! 
 
 """
@@ -100,6 +108,8 @@ Now you have to create a corresponding flag in [LaunchDarkly](https://app.launch
 2. Use this information to create a corresponding feature flag in LaunchDarkly.
 3. Enable the flag in LaunchDarkly by toggling Targeting to ON.
 
+![Site Release Flag]({})
+
 Once your site release flag is enabled in LaunchDarkly, you should see the new site in your App Runner's URL! 
 
 """
@@ -115,6 +125,8 @@ TASK2_UNRELEASED_MARKDOWN=True
 TASK2_COMPLETE_KEY="task2_complete"
 TASK2_COMPLETE_LABEL="The new Unicorn.Rentals is **LIVE** for user traffic!"
 TASK2_COMPLETE_VALUE="""
+![Released]({})
+
 Toggling the feature flag on for `siteRelease` has enabled the new version of the Unicorn.Rentals website... however, something looks wrong!? 
 
 Oh no, you can see debug messages reflected in the card views on the main page!!
@@ -127,6 +139,8 @@ TASK2_COMPLETE_MARKDOWN=True
 TASK3_KEY="task3"
 TASK3_LABEL="Task 3 - Uh, we've got a problem here. This data looks off."
 TASK3_VALUE="""
+![Debug Data]({})
+
 Your team notices significant amounts of debug data on the newly released Unicorn.Rentals site. We could just turn off the flag and take the site down, but fortunately we have a better option.
 
 During development, the team added enhanced logging behind a feature flag, which will only be available to specific users. This can be quite handy for isolating problems. 
@@ -172,7 +186,9 @@ From our last task, we learned that we are using local debug data instead of the
 Just like before, the development team has already staged our code for the database migration. To complete this task you must do the following: 
 
 1. Check the [application code](https://github.com/codyde/ld-aws-gameday/blob/6cfe5fc27d2d1a05d99cf815563ace17b504f2b1/main.py#L128) and retrieve the flag information. 
-2. Create a feature flag in LaunchDarkly to enable the database change.  
+2. Create a feature flag in LaunchDarkly to enable the database change.
+
+![Migration]({})
 
 After the feature flag is enabled, navigate to the `/health` endpoint to determine if Unicorn.Rentals is operating on the migrated cloud database. 
 """
@@ -190,6 +206,9 @@ TASK4_WRONG_MARKDOWN=True
 TASK4_CORRECT_KEY="task4_correct_answer"
 TASK4_CORRECT_LABEL="Look at that, our Unicorns are ALL CLOUDY NOW!"
 TASK4_CORRECT_VALUE="""
+
+![Success]({})
+
 Your migration is successful, you are now returning data to the Unicorn.Rentals UI from AWS DynamoDB!  
 
 In this example, we just made a hard switch to the new database, but with LaunchDarkly these changes can be made either gradually, or all at once. 
