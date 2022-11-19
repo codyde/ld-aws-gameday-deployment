@@ -223,6 +223,11 @@ TASK4_CORRECT_MARKDOWN=True
 # QUEST COMPLETE
 QUEST_COMPLETE_KEY='quest_complete'
 QUEST_COMPLETE_LABEL="You're a Dark Launcher now!"
-QUEST_COMPLETE_VALUE='Congratulations! You have successfully created feature flags for several features, used targeting to roll out features to specific users, and even migrated a database - all without redeploying your application once! Great work!'
+QUEST_COMPLETE_VALUE="""
+
+![Final]({})
+
+Congratulations! You have successfully created feature flags for several features, used targeting to roll out features to specific users, and even migrated a database - all without redeploying your application once! Great work!
+"""
 QUEST_COMPLETE_INDEX=100
 QUEST_COMPLETE_MARKDOWN=True

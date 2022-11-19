@@ -755,12 +755,15 @@ def lambda_handler(event, context):
                 bonus_points = calculate_bonus_points(quests_api_client, QUEST_ID, team_data)
 
                 # Post quest complete message
+
+                final = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}final.png", signed_duration=86400)
+
                 quests_api_client.post_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
                     key=output_const.QUEST_COMPLETE_KEY,
                     label=output_const.QUEST_COMPLETE_LABEL,
-                    value=output_const.QUEST_COMPLETE_VALUE,
+                    value=output_const.QUEST_COMPLETE_VALUE.format(final),
                     dashboard_index=output_const.QUEST_COMPLETE_INDEX,
                     markdown=output_const.QUEST_COMPLETE_MARKDOWN,
                 )
