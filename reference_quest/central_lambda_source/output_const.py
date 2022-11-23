@@ -38,7 +38,7 @@ When you're done entering the configuration and the application starts deploying
 Please note that you don't have to wait for the deployment to finish to provide your answer!
 
 """
-TASK1_INDEX=10
+TASK1_INDEX=5
 TASK1_MARKDOWN=True
 
 # TASK 1 - For outputting LD credentials
@@ -50,9 +50,9 @@ TASK1_CREDS_MARKDOWN=True
 TASK1_APPRUNNER_WRONG_KEY="task1_bad_app"
 TASK1_APPRUNNER_WRONG_LABEL="Well - there's nothing here"
 TASK1_APPRUNNER_WRONG_VALUE="""
-Uh oh! The App Runner name you entered isn't returning any data! Its possible that you used the wrong case int the name, or just a simple hoof-typo. Happens to the best unicorns. Sorry about the points loss! Head over to **App Runner** in your AWS account and give it another try.
+Uh oh! The App Runner name you entered isn't returning any data! Its possible that you used the wrong case in the name, or just a simple hoof-typo. Happens to the best unicorns. Sorry about the points loss! Head over to **App Runner** in your AWS account and give it another try.
 """ 
-TASK1_APPRUNNER_WRONG_INDEX=11
+TASK1_APPRUNNER_WRONG_INDEX=6
 TASK1_APPRUNNER_WRONG_MARKDOWN=True
 
 TASK1_APPRUNNER_INPUT_REMOVED_KEY='task1_input_remove'
@@ -76,7 +76,7 @@ Now we're going to use LaunchDarkly to manage our feature releases separate from
 Let's make a new API key so that other teams can use it to integrate with LaunchDarkly services. Navigate to LaunchDarkly and [create an API token](https://docs.launchdarkly.com/home/account-security/api-access-tokens#creating-api-access-tokens) using the `Custom Role` option with your student box checked, you don't need to change any other settings. Copy this API key and paste it below for the other teams at Unicorn.Rentals to use! 
 
 """
-TASK1_APPRUNNER_COMPLETE_INDEX=13
+TASK1_APPRUNNER_COMPLETE_INDEX=10       #13
 TASK1_APPRUNNER_COMPLETE_MARKDOWN=True
 
 # API Task addition

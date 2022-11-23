@@ -47,9 +47,10 @@ def check_webapp(apprunnerurl):
         print(f"Web app not available: {e}")
         return False
 
-def check_apprunner(apprunnername):
+def check_apprunner(apprunnername,quests_api_client, team_id):
     try:
-        client = boto3.client('apprunner')
+        xa_session = quests_api_client.assume_team_ops_role(team_id)
+        client = xa_session.client('apprunner')
         arsvc=client.list_services()
         print(arsvc)
         for i in arsvc['ServiceSummaryList']:
@@ -59,9 +60,10 @@ def check_apprunner(apprunnername):
         print(f"Unable to connect: {e}")
         return False
         
-def get_apprunner_url(apprunnername):
+def get_apprunner_url(apprunnername, quests_api_client, team_id):
     try:
-        client = boto3.client('apprunner')
+        xa_session = quests_api_client.assume_team_ops_role(team_id)
+        client = xa_session.client('apprunner')
         arsvc=client.list_services()
         print(arsvc)
         for i in arsvc['ServiceSummaryList']:
@@ -152,24 +154,6 @@ def getMigrationValue(team_data):
         print(f"You haven't migrated")
         return False
 
-def calculate_bonus_points(quests_api_client, quest_id, team_data):
-    quest = quests_api_client.get_quest_for_team(team_data['team-id'], QUEST_ID)
-
-    # Get quest start time
-    start_time = datetime.fromtimestamp(quest['quest-start-time'])
-
-    # Get quest end time, that is, current time
-    end_time = datetime.now()
-
-    # Calculate elapsed time
-    time_diff = end_time - start_time
-    minutes = int(time_diff.total_seconds() / 60)
-
-    # Calculate bonus points based on elapsed time
-    bonus_points = int(scoring_const.QUEST_COMPLETE_POINTS / minutes * scoring_const.QUEST_COMPLETE_MULTIPLIER)
-    print(f"Bonus points on {scoring_const.QUEST_COMPLETE_POINTS} done in {minutes} minutes: {bonus_points}")
-
-    return bonus_points
 
 # This function is triggered by sns_lambda.py whenever the team has provided input via the event UI. It validates
 # the input and performs related operations, such as updating the team's DynamoDB table record or posting a feedback message.
@@ -217,12 +201,12 @@ def lambda_handler(event, context):
             #     key=input_const.TASK1_ENDPOINT_KEY
             # )
 
-            apphealth = check_apprunner(input_value)
+            apphealth = check_apprunner(input_value, quests_api_client, team_data['team-id'])
 
             if apphealth == True:
                 print(f"Setting team_data is-webapp-up True, url, and updating Dynamo")
                 team_data['is-webapp-up'] = True
-                team_data['app-runner-url'] = get_apprunner_url(input_value)
+                team_data['app-runner-url'] = get_apprunner_url(input_value, quests_api_client, team_data['team-id'])
                 dynamodb_utils.save_team_data(team_data, quest_team_status_table)
 
                 quests_api_client.delete_input(
@@ -634,8 +618,8 @@ def lambda_handler(event, context):
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
                     key=output_const.TASK4_KEY,
-                    label=output_const.TASK4_LABEL.format(migration),
-                    value=output_const.TASK4_VALUE,
+                    label=output_const.TASK4_LABEL,
+                    value=output_const.TASK4_VALUE.format(migration),
                     dashboard_index=output_const.TASK4_INDEX,
                     markdown=output_const.TASK4_MARKDOWN,
                 )
@@ -751,19 +735,14 @@ def lambda_handler(event, context):
                     points=scoring_const.QUEST_COMPLETE_POINTS
                 )
 
-                # Award quest complete bonus points
-                bonus_points = calculate_bonus_points(quests_api_client, QUEST_ID, team_data)
-
-                # Post quest complete message
-
-                final = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}final.png", signed_duration=86400)
+                final_img = ui_utils.generate_signed_or_open_url(ASSETS_BUCKET, f"{ASSETS_BUCKET_PREFIX}final.png", signed_duration=86400)
 
                 quests_api_client.post_output(
                     team_id=team_data['team-id'],
                     quest_id=QUEST_ID,
                     key=output_const.QUEST_COMPLETE_KEY,
                     label=output_const.QUEST_COMPLETE_LABEL,
-                    value=output_const.QUEST_COMPLETE_VALUE.format(final),
+                    value=output_const.QUEST_COMPLETE_VALUE.format(final_img),
                     dashboard_index=output_const.QUEST_COMPLETE_INDEX,
                     markdown=output_const.QUEST_COMPLETE_MARKDOWN,
                 )
@@ -774,16 +753,6 @@ def lambda_handler(event, context):
                     description=scoring_const.MIGRATION_SUCCESS_DESC,
                     points=scoring_const.MIGRATION_SUCCESS_POINTS
                 )
-
-                quests_api_client.post_score_event(
-                    team_id=team_data["team-id"],
-                    quest_id=QUEST_ID,
-                    description=scoring_const.QUEST_COMPLETE_BONUS_DESC,
-                    points=bonus_points
-                )
-
-                # Complete quest
-                quests_api_client.post_quest_complete(team_id=team_data['team-id'], quest_id=QUEST_ID)
 
             else:
 

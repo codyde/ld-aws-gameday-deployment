@@ -3,7 +3,7 @@
 
 # TASK 1 - App Runner Endpoint
 TASK1_ENDPOINT_KEY='task1_endpoint'
-TASK1_ENDPOINT_INDEX=12
+TASK1_ENDPOINT_INDEX=7 #12
 TASK1_ENDPOINT_LABEL="What is the name you created for the  AWS App Runner instance?"
 TASK1_ENDPOINT_DESCRIPTION="ex: UnicornApp"
 
